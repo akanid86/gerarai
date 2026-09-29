@@ -1,0 +1,47 @@
+/* Separate transparent brand artwork over a continuous full-screen landscape. */
+:root {
+  color-scheme: light;
+  font-family: Arial, Helvetica, sans-serif;
+  color: #081b29;
+  background: #e6eaf0;
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+.page {
+  min-height: 100vh;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: clamp(12px, 2.5vh, 28px);
+  padding: 32px 20px 12vh;
+  background-image: url('assets/mountain-background.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.brand-art {
+  display: block;
+  width: min(880px, 86vw, 112vh);
+  height: auto;
+}
+h1 {
+  margin: 0;
+  padding-left: .24em;
+  font-size: clamp(2.5rem, 4.6vw, 4.75rem);
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: .24em;
+  text-shadow: 0 1px 18px rgba(255, 247, 231, .8);
+}
+@media (max-width: 600px) {
+  .page { padding: 32px 12px 17svh; gap: 26px; }
+  .brand-art { width: min(100%, 500px); }
+  h1 { font-size: clamp(2rem, 9vw, 3rem); }
+}
+@media (max-height: 500px) and (min-width: 601px) {
+  .page { padding: 16px 20px 24px; gap: 8px; }
+  .brand-art { width: auto; max-width: 80vw; height: 68svh; }
+  h1 { font-size: 2rem; }
+}
