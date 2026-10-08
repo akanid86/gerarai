@@ -1,0 +1,70 @@
+/* GERARAI Visual Direction A — "Warm Journey Journal" (v0.7.0-dev, pilot)
+ * Loaded after style.css. Scoped to Home/Feed (.feed-page) and Profile (.profile-wrap, incl. public profile).
+ * Pixel flavour only in: section label icons, class icons, one heading scene, empty-state mascot.
+ * Rollback: remove the <link> to this file in index.html (plus the small markup hooks listed in docs/VISUAL-DIRECTION-TH.md).
+ * No :root token changes; primary blue CTA, fonts, routes and handlers are untouched. */
+
+/* ---------- warm ground (only while Feed or Profile is on screen) ---------- */
+:root:has(#main > .feed-page), :root:has(#main > .profile-wrap) { background: #faf9f5; }
+body:has(#main > .feed-page), body:has(#main > .profile-wrap) { background: #faf9f5; }
+
+/* ---------- shared surfaces ---------- */
+.feed-page .panel, .feed-page .post-card, .profile-wrap .profile-card { border-color: #ebe5d8; }
+.feed-page .post-card { box-shadow: 0 1px 2px #3c2d140a; }
+.feed-page .feed-tabs, .profile-wrap .profile-tabs { border-bottom-color: #e9e2d4; }
+.feed-page .date-note { color: #59675f; }
+
+/* ---------- Feed: heading label + one small scene in the empty corner ---------- */
+.vd-compass { display: inline-block; width: 24px; height: 24px; margin-left: 4px; vertical-align: -3px; background: url('assets/pixel/compass.svg') center/contain no-repeat; image-rendering: pixelated; }
+.feed-page > .page-heading { position: relative; padding-right: 126px; min-height: 56px; }
+.feed-page > .page-heading::after {
+  content: ''; position: absolute; right: 0; bottom: -4px; width: 108px; height: 48px;
+  background: url('assets/pixel/trail.svg') center/contain no-repeat; image-rendering: pixelated;
+  pointer-events: none; opacity: .92;
+}
+.feed-page .stories { background: #fffefb; }
+
+/* right rail: warmer, flatter journey summary (same content, same handlers) */
+.feed-page .right-rail .adventure-card { background: #fffaf0; border-color: #efe3c8; }
+.feed-page .right-rail .rail-head h2 { display: flex; align-items: center; gap: 8px; }
+.feed-page .right-rail .badge-strip { background: #fffdf8; }
+
+/* ---------- empty states: one still mascot, content first ---------- */
+.feed-page #feed-posts .empty-state > svg:first-child,
+.profile-wrap #profile-content .empty-state > svg:first-child { display: none; }
+.feed-page #feed-posts .empty-state::before,
+.profile-wrap #profile-content .empty-state::before {
+  content: ''; display: block; width: 48px; height: 48px; margin: 0 auto 10px;
+  background: url('assets/pixel/mascot.svg') center/contain no-repeat; image-rendering: pixelated;
+}
+
+/* ---------- Profile ---------- */
+.profile-wrap .progress-card { background: #fffdf8; border-color: #efe6d3; }
+.profile-wrap .progress-kicker { display: flex; align-items: center; gap: 6px; color: #6f6a5c; }
+.profile-wrap .progress-kicker::before {
+  content: ''; width: 16px; height: 16px; flex: 0 0 16px;
+  background: url('assets/pixel/compass.svg') center/contain no-repeat; image-rendering: pixelated;
+}
+.profile-wrap .progress-class { background: #f7f9f4; border-color: #dfe6da; }
+.profile-wrap .progress-class.readonly:hover { background: #f7f9f4; }
+.profile-wrap .badge-strip { background: #fffdf8; border-color: #eee6d4; }
+.profile-wrap .badge-strip-head span { color: #59675f; }
+
+/* pixel class icons (progression.js classIcon) — integer-friendly sizes, crisp */
+.pixel-class-art { display: block; width: 24px; height: 24px; image-rendering: pixelated; }
+.progress-class-icon { display: grid; place-items: center; width: 32px; height: 32px; flex: 0 0 32px; border-radius: 8px; background: #fff; border: 1px solid #e6dfcf; }
+.explorer-icon .pixel-class-art { width: 36px; height: 36px; }
+.explorer-icon:has(.pixel-class-art) { filter: none; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 10px; background: #fff; border: 1px solid #eadfc4; }
+
+/* ---------- mobile: content first — decoration shrinks or hides before content does ---------- */
+@media (max-width: 700px) {
+  :root:has(#main > .feed-page), :root:has(#main > .profile-wrap),
+  body:has(#main > .feed-page), body:has(#main > .profile-wrap) { background: #fffdf9; }
+  .feed-page .post-card { box-shadow: none; border-bottom-color: #f3eee4; }
+  .feed-page .stories { background: transparent; }
+  .profile-wrap .progress-kicker::before { width: 12px; height: 12px; flex-basis: 12px; }
+  .profile-wrap .badge-strip-row { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent); padding-right: 24px; }
+}
+@media (max-width: 1000px) { .feed-page > .page-heading::after { width: 72px; height: 32px; } .feed-page > .page-heading { padding-right: 84px; } }
+
+@media (forced-colors: active) { .feed-page > .page-heading::after, .empty-state::before { display: none; } }

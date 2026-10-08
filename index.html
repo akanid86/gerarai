@@ -1,22 +1,79 @@
 <!doctype html>
-<html lang="en">
+<html lang="th">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#edf0f2">
-  <meta name="description" content="GERARAI — Real Life Social Adventure. Coming soon.">
-  <meta property="og:title" content="GERARAI — Coming Soon">
-  <meta property="og:description" content="Real Life Social Adventure. Coming soon.">
-  <meta property="og:type" content="website">
-  <title>GERARAI — Coming Soon</title>
-  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
-  <link rel="preload" as="image" href="assets/mountain-background.png">
-  <link rel="stylesheet" href="style.css?v=3">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f8fafc">
+  <meta name="description" content="GERARAI — Real Life Social Adventure. ต้นแบบการค้นพบสถานที่และแบ่งปันเรื่องราว">
+  <title>GERARAI — Real Life Social Adventure</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="vendor/leaflet.css?v=0.7.0-dev">
+  <link rel="stylesheet" href="style.css?v=pd2">
+  <link rel="stylesheet" href="map-marker-visual.css?v=pd5">
+  <link rel="stylesheet" href="visual-direction.css?v=1">
+  <link rel="stylesheet" href="visual-world.css?v=1">
+  <link rel="stylesheet" href="category-marker-visual.css?v=1">
+  <link rel="stylesheet" href="journey-summary.css?v=2">
+  <link rel="stylesheet" href="onboarding.css?v=2">
+  <link rel="stylesheet" href="legal-pages.css?v=1">
+  <link rel="stylesheet" href="character-expansion.css?v=g1.4">
+  <link rel="stylesheet" href="profile-share-card.css?v=card4">
+  <script src="category-icons.js?v=1" defer></script>
+  <script src="vendor/leaflet.js?v=0.7.0-dev" defer></script>
+  <script src="config.js?v=0.7.0-dev" defer></script>
+  <script src="sample-data.js?v=0.7.0-dev" defer></script>
+  <script src="store.js?v=0.7.0-dev" defer></script>
+  <script src="legal-published.js?v=1" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js" integrity="sha384-Rj26LVGvoeRVR6+mwQmFfcR3QOBEwT+ZmuCWpuiqeTzJpCs0ER4ITAWGb4Hiy3Ok" crossorigin="anonymous" defer></script>
+  <script src="character.js?v=0.7.0-dev" defer></script>
+  <script src="companion.js?v=g1.1" defer></script>
+  <script src="character-expansion.js?v=g1.2" defer></script>
+  <script src="progression.js?v=0.7.0-dev.vd1" defer></script>
+  <script src="avatar.js?v=0.7.0-dev" defer></script>
+  <script src="cover.js?v=0.7.0-dev" defer></script>
+  <script src="discovery-core.js?v=0.7.0-pixel-color1" defer></script>
+  <script src="emergency-core.js?v=0.7.0-dev" defer></script>
+  <script src="map-provider.js?v=pd5" defer></script>
+  <script src="checkin-read.js?v=s3" defer></script>
+  <script src="remote.js?v=s4" defer></script>
+  <script src="app.js?v=s3" defer></script>
+  <script src="legal-docs.js?v=1" defer></script>
+  <script src="profile-cover-motion.js?v=1" defer></script>
+  <script src="live.js?v=s4" defer></script>
+  <script src="checkin-explore.js?v=s3" defer></script>
+  <link rel="stylesheet" href="checkin-explore.css?v=s3">
+  <script src="profile-share-card.js?v=card4" defer></script>
+  <script src="emergency-ui.js?v=0.7.0-pixel-color1" defer></script>
+  <script src="discovery-ui.js?v=s3" defer></script>
+  <script src="onboarding-ui.js?v=s4" defer></script>
+  <script src="checkin-composer.js?v=s4" defer></script>
+  <link rel="stylesheet" href="checkin-composer.css?v=s4">
+  <script src="journey-summary.js?v=j1-copy2" defer></script>
+  <script src="visual-world.js?v=1" defer></script>
+  <link rel="stylesheet" href="profile-cover-motion.css?v=1">
 </head>
 <body>
-  <main class="page">
-    <img class="brand-art" src="assets/gerarai-logo.png" alt="GERARAI — Real Life Social Adventure" width="1655" height="950" fetchpriority="high">
-    <h1>SOON</h1>
-  </main>
+  <a class="skip-link" href="#main">ข้ามไปเนื้อหา</a>
+  <header class="topbar">
+    <a class="brand" href="#feed" aria-label="GERARAI หน้าหลัก"><span class="brand-symbol brand-icon" aria-hidden="true"><img src="assets/gerarai-mark.png" srcset="assets/gerarai-mark.png 1x, assets/gerarai-mark@2x.png 2x" width="240" height="144" alt="" decoding="async"></span><span class="brand-wordmark"><strong>GERARAI</strong><small>Real Life Social Adventure</small></span></a>
+    <form id="global-search" class="global-search" role="search"><span data-icon="search"></span><input id="search-input" type="search" placeholder="ค้นหาสถานที่ เมือง หรือเรื่องราว…" aria-label="ค้นหาสถานที่ เมือง หรือเรื่องราว"><kbd>/</kbd></form>
+    <div class="header-actions"><span class="prototype-tag">ต้นแบบทดลอง</span><button class="icon-button mobile-search" data-action="search-dialog" aria-label="ค้นหา"><span data-icon="search"></span></button><button class="icon-button notification-button" data-action="notifications" aria-label="การแจ้งเตือน"><span data-icon="bell"></span><i></i></button><button class="avatar avatar-header" data-nav="profile" aria-label="เปิดโปรไฟล์ของฉัน">B</button></div>
+  </header>
+  <div class="app-layout">
+    <aside class="sidebar" aria-label="เมนูหลัก">
+      <nav id="desktop-nav"></nav>
+      <button class="primary compose-button" data-action="compose"><span data-icon="plus"></span>แชร์เรื่องราว</button>
+      <div class="sidebar-divider"></div>
+      <p class="nav-caption">การผจญภัยของฉัน</p>
+      <button class="side-link" data-nav="saved"><span data-icon="bookmark"></span>บันทึกไว้<span id="saved-count" class="count">0</span></button>
+      <button class="side-link" data-action="badges"><span data-icon="award"></span>เหรียญสะสม</button>
+      <div class="sidebar-bottom"><div class="tiny-landscape"></div><p>ทุกวันคือการผจญภัย<br>ทุกคนคือเรื่องราวที่มีค่า</p><small>GERARAI © 2026 · v0.5.2</small><button class="text-button" data-action="about">เกี่ยวกับต้นแบบนี้</button><span class="sidebar-legal"><a href="#privacy">ความเป็นส่วนตัว</a> · <a href="#terms">ข้อกำหนด</a></span></div>
+    </aside>
+    <main id="main" tabindex="-1"></main>
+  </div>
+  <nav class="bottom-nav" id="bottom-nav" aria-label="เมนูมือถือ"></nav>
+  <dialog id="dialog" aria-labelledby="dialog-title"><div class="dialog-header"><h2 id="dialog-title"></h2><button class="icon-button" data-action="close-dialog" aria-label="ปิด"><span data-icon="x"></span></button></div><div id="dialog-content"></div></dialog>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <noscript><p class="empty-state">กรุณาเปิด JavaScript เพื่อทดลองใช้งาน GERARAI</p></noscript>
 </body>
 </html>

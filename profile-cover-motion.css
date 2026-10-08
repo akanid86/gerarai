@@ -1,0 +1,31 @@
+/* Default covers only. Member-uploaded photos retain their original presentation. */
+.profile-cover:has(>.living-cover){position:relative;isolation:isolate;background:none!important;overflow:hidden}
+.living-cover{position:absolute;inset:0;overflow:hidden;pointer-events:none;background:linear-gradient(var(--cover-sky-top,#cfe6f5),var(--cover-sky-bottom,#eef0e6));image-rendering:pixelated}
+.living-cover *{pointer-events:none}
+.profile-cover:has(>.living-cover)>.cover-edit,.profile-cover:has(>.living-cover)>.cover-more{z-index:2}
+.cover-terrain{position:absolute;inset:0;background:url('assets/pixel/world/cover-horizon.svg') center bottom/1280px 96px no-repeat;filter:brightness(var(--cover-light,1))}
+.cover-orb{position:absolute;width:32px;height:32px;right:22%;top:19%;background:#ffe6a7;clip-path:polygon(25% 0,75% 0,75% 12%,88% 12%,88% 25%,100% 25%,100% 75%,88% 75%,88% 88%,75% 88%,75% 100%,25% 100%,25% 88%,12% 88%,12% 75%,0 75%,0 25%,12% 25%,12% 12%,25% 12%)}
+.living-cover[data-night=true] .cover-orb{background:#f3edcc;clip-path:polygon(25% 0,75% 0,50% 16%,37% 38%,37% 62%,50% 82%,75% 100%,25% 100%,25% 88%,12% 88%,12% 75%,0 75%,0 25%,12% 25%,12% 12%,25% 12%)}
+.cover-stars{position:absolute;inset:0;opacity:0;background:radial-gradient(circle at 14% 19%,#efe7cc 0 1px,transparent 2px),radial-gradient(circle at 35% 32%,#efe7cc 0 1px,transparent 2px),radial-gradient(circle at 57% 13%,#efe7cc 0 1px,transparent 2px),radial-gradient(circle at 87% 43%,#efe7cc 0 1px,transparent 2px)}
+.living-cover[data-night=true] .cover-stars{opacity:1}
+.cover-cloud{position:absolute;top:25%;left:14%;width:76px;height:18px;background:#fff;opacity:.5;clip-path:polygon(0 40%,15% 40%,15% 0,55% 0,55% 20%,80% 20%,80% 60%,100% 60%,100% 100%,0 100%)}
+.cloud-two{left:53%;top:40%;width:50px;opacity:.3}
+.living-cover[data-night=true] .cover-cloud{opacity:.12}
+.cover-travelers{position:absolute;left:72%;bottom:5px;display:flex;align-items:flex-end;gap:7px}
+.cover-gerdey{width:64px;height:64px;transform-origin:50% 100%}
+.cover-pet{width:24px;height:24px;transform-origin:50% 100%}
+.cover-gerdey>svg,.cover-pet>svg{display:block;width:100%;height:100%}
+@media(prefers-reduced-motion:no-preference){
+ .cover-gerdey{animation:cover-idle 7s steps(1,end) infinite;animation-play-state:paused}
+ .cover-pet{animation:cover-pet-play 6s steps(1,end) infinite;animation-play-state:paused}
+ .pet-bird,.pet-rabbit{animation-name:cover-hop}
+ .cover-cloud{animation:cover-drift 65s linear infinite alternate;animation-play-state:paused}
+ .cloud-two{animation-duration:85s;animation-delay:-20s}
+ .living-cover.is-running .cover-gerdey,.living-cover.is-running .cover-pet,.living-cover.is-running .cover-cloud{animation-play-state:running}
+}
+@keyframes cover-idle{0%,70%,100%{transform:translateY(0)}74%,82%{transform:translateY(-2px)}78%,86%{transform:translateY(-1px)}}
+@keyframes cover-pet-play{0%,50%,100%{transform:translate(0,0)}55%,65%{transform:translate(-3px,-2px)}60%,70%{transform:translate(-5px,0)}80%{transform:translate(-2px,-1px)}}
+@keyframes cover-hop{0%,60%,100%{transform:translate(0,0)}65%,80%{transform:translate(-2px,-4px)}70%,85%{transform:translate(-3px,0)}}
+@keyframes cover-drift{to{transform:translateX(65px)}}
+@media(max-width:700px){.cover-terrain{background-size:640px 48px}.cover-travelers{left:65%;bottom:3px;gap:4px}.cover-gerdey{width:48px;height:48px}.cover-pet{width:18px;height:18px}.cover-orb{width:24px;height:24px}}
+html.vd-off .living-cover{display:none}

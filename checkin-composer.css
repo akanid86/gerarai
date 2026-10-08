@@ -1,0 +1,18 @@
+.s4-composer .s4-fields { border:0; padding:0; margin:0; min-width:0; }
+.s4-composer details { margin:12px 0; }
+.s4-composer summary { cursor:pointer; color:#557267; }
+.s4-composer textarea { min-height:140px; }
+.s4-composer .photo-upload { position:relative; display:flex; gap:8px; align-items:center; justify-content:center; padding:16px; cursor:pointer; }
+.s4-composer .photo-upload input { position:absolute; inset:0; opacity:0; width:100%; cursor:pointer; }
+.s4-composer .photo-upload:focus-within { outline:2px solid #426d56; outline-offset:3px; }
+.s4-media { display:flex; gap:12px; flex-wrap:wrap; margin:12px 0; }
+.s4-media > div { display:flex; flex-direction:column; max-width:140px; }
+.s4-media img { width:100%; max-height:150px; object-fit:cover; border-radius:10px; }
+.s4-checkin { display:flex; gap:8px; flex-wrap:wrap; margin:16px 0; }
+.s4-choices { display:grid; gap:12px; }
+.s4-choices [data-s4-results] { display:grid; gap:8px; }
+.s4-choices [data-s4-results] h3 { margin:8px 0; font-size:.9rem; }
+.s4-choices button { text-align:left; white-space:normal; }
+.s4-map { height:260px; border-radius:12px; overflow:hidden; margin-bottom:12px; background:#eef3ec; }
+.s4-composer .form-submit { flex-wrap:wrap; }
+@media(max-width:480px){.s4-map{height:220px}.s4-composer .form-submit > button{flex:1;min-width:100px}}

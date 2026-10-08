@@ -1,0 +1,13 @@
+/* GERARAI — legal pages from one source (legal-docs.js). */
+.legal-page .legal-body{font-size:.9rem;line-height:1.9}
+.legal-page .legal-body p{margin:12px 0}
+.legal-h{font-size:1rem;margin:24px 0 8px;color:var(--navy)}
+.legal-meta{font-size:.78rem;margin:2px 0 12px}
+.legal-none{font-size:.9rem;line-height:1.8;margin:14px 0}
+.legal-dev-hint{font-size:.76rem;margin-top:18px;color:#8a6d1f}
+.legal-dev-hint a,.legal-none a{color:var(--blue);text-decoration:underline}
+.legal-gap{background:#ffe58f;color:#5c4700;border-radius:4px;padding:0 3px}
+.legal-nav{display:flex;flex-wrap:wrap;gap:6px 14px;border-top:1px solid var(--border);margin-top:28px;padding-top:16px;font-size:.78rem}
+.legal-nav a{color:var(--blue)}
+.legal-nav [aria-current]{color:var(--navy);font-weight:700}
+.legal-candidate-banner strong{margin-bottom:2px}

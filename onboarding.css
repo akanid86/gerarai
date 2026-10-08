@@ -1,0 +1,46 @@
+/* GERARAI — S4 Onboarding (v0.7.0-dev). Scoped to .onb-* only. */
+.onb-dialog{width:min(560px,calc(100% - 28px))}
+.onb-dialog .dialog-header{justify-content:flex-start}
+.onb-body{padding:20px 22px 22px}
+.onb-lead{font-size:.9rem;line-height:1.8;margin-bottom:16px}
+.onb-note{font-size:.76rem;color:#6b7588;line-height:1.75;margin:10px 0 0}
+.onb-box{border:1px solid var(--border);border-radius:16px;padding:14px 15px;margin-bottom:12px;background:#fff}
+.onb-age{background:var(--soft);border-color:#d6e3fb}
+.onb-check{display:flex;gap:12px;align-items:flex-start;cursor:pointer;font-size:.88rem;line-height:1.75}
+.onb-check input{width:22px;height:22px;margin:2px 0 0;flex:0 0 22px;accent-color:var(--blue);cursor:pointer}
+.onb-statement{font-weight:700}
+.onb-link{color:var(--blue);text-decoration:underline;text-underline-offset:3px;font-weight:600;padding:0;display:inline;font-size:inherit;line-height:inherit;cursor:pointer}
+.onb-notice{font-size:.84rem;line-height:1.75;color:#3d4960;margin:4px 2px 14px}
+.onb-changes{list-style:none;margin:0 0 14px;padding:12px 14px;border-radius:14px;background:#fff8e8;border:1px solid #f3e0b0;display:grid;gap:8px}
+.onb-changes li{display:grid;gap:2px;font-size:.82rem;line-height:1.65}
+.onb-changes span{color:#5b5130}
+.onb-actions{display:flex;gap:10px;align-items:center;justify-content:flex-end;flex-wrap:wrap;margin-top:6px}
+.onb-actions .primary,.onb-actions .secondary{margin:0;min-height:44px}
+.onb-actions .primary:disabled{cursor:not-allowed;opacity:.45}
+.onb-signout{display:block;margin:14px auto 0;font-size:.78rem;color:#7a8497;text-decoration:underline}
+.onb-body .form-error{margin:4px 0 12px}
+.onb-meta{font-size:.76rem;color:#7a8497;margin:4px 0 10px}
+.onb-back{display:inline-block;font-size:.82rem;margin:0 0 6px;padding:6px 0}
+.onb-doc-text{max-height:min(52svh,440px);overflow:auto;border:1px solid var(--border);border-radius:14px;padding:4px 16px;background:#fbfcfe;font-size:.86rem;line-height:1.85}
+.onb-doc-text p{margin:12px 0}
+.onb-doc-h{font-size:.9rem;margin:18px 0 6px;color:var(--navy)}
+.onb-doc .onb-actions{margin-top:14px}
+.onb-feature .emg-help-notice{margin-bottom:12px}
+.onb-feature-text{max-height:min(40svh,340px)}
+.onb-loc-card{border:1px solid #f0d49a;background:#fff8e6;border-radius:14px;padding:12px 14px;margin:10px 0 12px;font-size:.8rem;line-height:1.7;color:#4c4126}
+.onb-loc-card strong{display:block;font-size:.84rem;margin-bottom:4px;color:#3b3220}
+.onb-loc-full{margin-top:8px;max-height:220px;overflow:auto;border-top:1px dashed #e8d29b;padding-top:6px}
+.onb-loc-full p{margin:8px 0}
+.onb-loc-actions{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-top:8px}
+.onb-loc-actions .secondary{margin:0;width:auto}
+.onb-loc-error{color:#9b2c2c;font-weight:600;margin-top:6px}
+.onb-loc-done{font-size:.78rem;color:#2d6a3e;margin:8px 0 10px}
+.onb-banner{background:#eef4ff;border-bottom:1px solid #d6e3fb;color:#23406f;text-align:center;font-size:.8rem;padding:8px 12px;position:relative;z-index:29;line-height:1.6}
+.onb-banner .text-button{display:inline;font-size:inherit;margin-left:8px;text-decoration:underline;color:var(--blue);font-weight:600;padding:0}
+@media (max-width:640px){
+  .onb-body{padding:16px 16px 18px}
+  .onb-lead{font-size:.86rem}
+  .onb-actions{flex-direction:column-reverse;align-items:stretch}
+  .onb-actions .primary,.onb-actions .secondary{width:100%}
+  .onb-doc-text{max-height:56svh;padding:2px 13px}
+}

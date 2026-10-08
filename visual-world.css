@@ -1,0 +1,80 @@
+/* GERARAI Visual Direction A+ — static pixel-world layer (v0.7.0-dev)
+ * Loaded after visual-direction.css. Decoration only: aria-hidden, pointer-events:none, absolutely/fixed positioned
+ * (never in document flow), shown only while Feed or Profile is on screen, hidden before content is squeezed.
+ * No animation in this round: sprites carry data-anim hooks for an optional visual-world-motion.css later
+ * (must live inside @media (prefers-reduced-motion: no-preference)).
+ * Kill switch / measurement: <html class="vd-off"> hides every decoration from A and A+.
+ * Rollback: remove the <link> to this file and the <script src="visual-world.js"> in index.html. */
+
+.vd-deco, .vd-deco * { pointer-events: none !important; }
+.feed-page #feed-posts .empty-state::before, .profile-wrap #profile-content .empty-state::before { pointer-events: none; } /* Visual A mascot */
+.vd-deco { position: absolute; image-rendering: pixelated; background-repeat: no-repeat; background-size: 100% 100%; }
+
+/* ---------- D6 default pixel cover — only covers WITHOUT a member's own image ----------
+ * Selector requires the default caption, which the renderers print only when there is no custom cover.
+ * .has-custom (own and public profiles) is excluded twice over; its inline background-image is never touched. */
+.profile-cover:not(.has-custom):has(> .cover-caption) {
+  background:
+    url('assets/pixel/world/cover-actors.svg') 80% calc(100% - 4px) / 176px 80px no-repeat,
+    url('assets/pixel/world/cover-horizon.svg') center bottom / 1280px 96px no-repeat,
+    url('assets/pixel/world/cover-sky.svg') center top / 1280px 160px no-repeat,
+    linear-gradient(180deg, #cfe6f5 0%, #eef0e6 62%, #f9e6cc 100%);
+  image-rendering: pixelated;
+}
+.profile-cover:not(.has-custom):has(> .cover-caption) > .cover-caption { display: none; }
+@media (max-width: 700px) {
+  /* mobile: horizon band only (≈6% of the first screen) — no sky sprites */
+  .profile-cover:not(.has-custom):has(> .cover-caption) {
+    background:
+      url('assets/pixel/world/cover-actors.svg') 88% calc(100% - 2px) / 88px 40px no-repeat,
+      url('assets/pixel/world/cover-horizon.svg') center bottom / 640px 48px no-repeat,
+      linear-gradient(180deg, #cfe6f5 0%, #eef0e6 70%, #f9e6cc 100%);
+  }
+}
+
+/* ---------- D1 heading corner: richer scene, same box as Visual A (no layout change) ---------- */
+.feed-page > .page-heading::after { background-image: url('assets/pixel/world/heading.svg'); }
+
+/* ---------- D2 rail companion (feed, desktop) — track is created/removed by visual-world.js ---------- */
+.feed-page .feed-layout { position: relative; }
+.vd-rail-track { position: absolute; z-index: 0; }
+.vd-rail-scene { position: sticky; top: var(--vd-sticky-top, 106px); width: 100%; aspect-ratio: 64 / 40; image-rendering: pixelated;
+  background: url('assets/pixel/world/rail-companion.svg') center / contain no-repeat; }
+
+/* ---------- D3 sidebar flowers (desktop, only when the sidebar has a real gap) ---------- */
+.vd-sidebar-scene { left: 28px; width: 120px; height: 48px; background-image: url('assets/pixel/world/sidebar-flowers.svg'); display: none; }
+:root:has(#main > .feed-page, #main > .profile-wrap) .vd-sidebar-scene.vd-on { display: block; }
+
+/* ---------- D4 wide-screen gutters (fixed, outside the 1640px layout) ---------- */
+.vd-gutters { display: none; position: fixed; left: 0; bottom: 0; width: 0; height: 0; pointer-events: none; }
+@media (min-width: 1832px) and (min-height: 700px) {
+  :root:has(#main > .feed-page, #main > .profile-wrap) .vd-gutters { display: block; }
+  .vd-gutters > i { position: fixed; bottom: 0; width: 120px; height: 256px; z-index: -1; image-rendering: pixelated; background: center bottom / 100% 100% no-repeat; opacity: .85; }
+  .vd-gutters > .vd-gl { left: calc((100vw - 1640px) / 2 - 132px); background-image: url('assets/pixel/world/gutter-left.svg'); }
+  .vd-gutters > .vd-gr { right: calc((100vw - 1640px) / 2 - 132px); background-image: url('assets/pixel/world/gutter-right.svg'); }
+}
+
+/* ---------- D5 profile gutters (≥1430px: at least ~106px free each side of the 980px card) ---------- */
+@media (min-width: 1430px) {
+  .profile-wrap { position: relative; }
+  .profile-wrap::before, .profile-wrap::after { content: ''; position: absolute; pointer-events: none; image-rendering: pixelated; background: center / 100% 100% no-repeat; }
+  .profile-wrap::before { left: -96px; top: 140px; width: 80px; height: 160px; background-image: url('assets/pixel/world/profile-tree.svg'); }
+  .profile-wrap::after { right: -90px; top: 244px; width: 72px; height: 56px; background-image: url('assets/pixel/world/profile-cat.svg'); }
+}
+
+/* ---------- D7 camp beside "หมวดหมู่สถานที่ยอดนิยม" (end of feed) ---------- */
+.feed-page .category-section { position: relative; }
+.feed-page .category-section::before { content: ''; position: absolute; top: -10px; right: 0; width: 72px; height: 36px; pointer-events: none;
+  background: url('assets/pixel/world/camp.svg') center / 100% 100% no-repeat; image-rendering: pixelated; }
+@media (max-width: 700px) { .feed-page .category-section::before { right: 18px; top: -4px; width: 48px; height: 24px; } }
+
+/* ---------- kill switch (also used by the budget test) ---------- */
+html.vd-off .vd-rail-track, html.vd-off .vd-sidebar-scene, html.vd-off .vd-gutters,
+html.vd-off .profile-wrap::before, html.vd-off .profile-wrap::after, html.vd-off .feed-page .category-section::before,
+html.vd-off .feed-page > .page-heading::after { display: none !important; }
+html.vd-off .empty-state::before { visibility: hidden; }
+html.vd-off .vd-compass, html.vd-off .profile-wrap .progress-kicker::before { visibility: hidden; }
+html.vd-off .profile-cover:not(.has-custom):has(> .cover-caption) { background: linear-gradient(180deg, #cfe6f5 0%, #eef0e6 62%, #f9e6cc 100%); }
+
+@media (forced-colors: active) { .vd-rail-track, .vd-sidebar-scene, .vd-gutters, .profile-wrap::before, .profile-wrap::after, .feed-page .category-section::before { display: none; } }
+@media print { .vd-rail-track, .vd-sidebar-scene, .vd-gutters { display: none; } }

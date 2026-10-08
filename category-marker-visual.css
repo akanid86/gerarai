@@ -1,0 +1,34 @@
+/* Approved category colors. Keep map anchors, events and emergency state styling intact. */
+.category-icon{display:inline-block;width:24px;height:24px;flex-shrink:0;vertical-align:middle}
+.discovery-pin .category-icon,.map-pin .category-icon,.emg-pin .category-icon{width:32px;height:32px;display:block}
+.discovery-pin:has(.category-icon){border-width:2px;border-radius:9px 9px 9px 2px}
+.map-pin:has(.category-icon){transform:none;border-width:2px;border-radius:9px 9px 9px 2px}
+.map-pin:has(.category-icon) b{transform:none}
+.discovery-card-copy small .category-icon,.discovery-preview-card small .category-icon,.emg-feed-type .category-icon{width:16px;height:16px}
+.emg-card-icon .category-icon,.emg-type b .category-icon,.place-icon .category-icon{width:32px;height:32px}
+.emg-pin.emg-expired .category-icon,.emg-pin.emg-resolved .category-icon{filter:grayscale(1)}
+.emg-type input:checked+span b,.emg-filters button.active .category-icon,.discovery-filters button.active .category-icon{background:#fffefa;border-radius:4px}
+.discovery-pin:has([data-category-icon="food"]),.map-pin:has([data-category-icon="food"]){background:#fff2e5!important;border-color:#a44e28}
+.discovery-pin:has([data-category-icon="cafe"]),.map-pin:has([data-category-icon="cafe"]){background:#f5ece3!important;border-color:#765035}
+.discovery-pin:has([data-category-icon="nature"]),.map-pin:has([data-category-icon="nature"]){background:#edf5e9!important;border-color:#34704b}
+.discovery-pin:has([data-category-icon="animal"]),.map-pin:has([data-category-icon="animal"]){background:#fbf1df!important;border-color:#93632b}
+.discovery-pin:has([data-category-icon="music_event"]),.map-pin:has([data-category-icon="music_event"]){background:#f3edfa!important;border-color:#77519e}
+.discovery-pin:has([data-category-icon="life"]),.map-pin:has([data-category-icon="life"]){background:#fdeef3!important;border-color:#b44769}
+.discovery-pin:has([data-category-icon="strange"]),.map-pin:has([data-category-icon="strange"]){background:#eef1fc!important;border-color:#5267a6}
+.discovery-pin:has([data-category-icon="toilet"]),.map-pin:has([data-category-icon="toilet"]){background:#edf5fb!important;border-color:#356d99}
+.discovery-pin:has([data-category-icon="shower"]),.map-pin:has([data-category-icon="shower"]){background:#eaf6f6!important;border-color:#217987}
+.discovery-pin:has([data-category-icon="other"]),.map-pin:has([data-category-icon="other"]){background:#f0f2ed!important;border-color:#626d65}
+.discovery-pin:has([data-category-icon="flood"]),.map-pin:has([data-category-icon="flood"]){background:#fffefa!important;border-color:#2b709b}
+.discovery-pin:has([data-category-icon="road_passable"]),.map-pin:has([data-category-icon="road_passable"]){background:#fffefa!important;border-color:#4e6384}
+.discovery-pin:has([data-category-icon="road_blocked"]),.map-pin:has([data-category-icon="road_blocked"]){background:#fffefa!important;border-color:#b5473c}
+.discovery-pin:has([data-category-icon="shelter"]),.map-pin:has([data-category-icon="shelter"]){background:#fffefa!important;border-color:#a35c30}
+.discovery-pin:has([data-category-icon="food_water"]),.map-pin:has([data-category-icon="food_water"]){background:#fffefa!important;border-color:#2b709b}
+.discovery-pin:has([data-category-icon="medical"]),.map-pin:has([data-category-icon="medical"]){background:#fffefa!important;border-color:#34704b}
+.discovery-pin:has([data-category-icon="power_charging"]),.map-pin:has([data-category-icon="power_charging"]){background:#fffefa!important;border-color:#987018}
+.discovery-pin:has([data-category-icon="help_request"]),.map-pin:has([data-category-icon="help_request"]){background:#fffefa!important;border-color:#a45c20}
+.discovery-pin:has([data-category-icon="recovered"]),.map-pin:has([data-category-icon="recovered"]){background:#fffefa!important;border-color:#34704b}
+.discovery-pin:has([data-category-icon="stay"]),.map-pin:has([data-category-icon="stay"]){background:#ecf5f6!important;border-color:#367585}
+.discovery-pin:has([data-category-icon="culture"]),.map-pin:has([data-category-icon="culture"]){background:#f5eef7!important;border-color:#805495}
+.discovery-pin:has([data-category-icon="travel"]),.map-pin:has([data-category-icon="travel"]){background:#eef1fc!important;border-color:#5267a6}
+.discovery-pin:has([data-category-icon="all"]),.map-pin:has([data-category-icon="all"]){background:#fbf4df!important;border-color:#8b6a27}
+.discovery-pin:has([data-category-icon="health"]),.map-pin:has([data-category-icon="health"]){background:#edf5e9!important;border-color:#34704b}

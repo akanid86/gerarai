@@ -1,0 +1,5 @@
+.checkin-explore { margin: 24px 18px; }
+.checkin-explore [data-area-options] { display:flex; flex-wrap:wrap; gap:8px; }
+.checkin-explore [data-area-options] [aria-pressed="true"] { border-color:#426d56; background:#eef4e9; color:#294b3e; }
+.checkin-explore [data-search-status] { margin:12px 0; }
+.checkin-explore [data-search-next] { margin-top:16px; }
