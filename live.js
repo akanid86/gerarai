@@ -434,7 +434,7 @@
       <div id="pixel-editor-wrap" class="pixel-editor-wrap">${Character.editorMarkup(workingSpec)}<div class="character-editor-actions"><button class="secondary" type="button" id="pixel-random">🎲 สุ่มตัวละคร</button><button class="secondary" type="button" id="pixel-reset">คืนค่าที่บันทึก</button><button class="secondary" type="button" id="pixel-undo">ย้อนกลับ</button><button class="primary" type="button" id="pixel-save">ใช้ตัวละครนี้</button></div></div>
       <p class="form-help" id="avatar-status">Pixel Character เป็นตัวตนในโลก GERARAI ส่วนรูปจริงยังเก็บแยกกันและสลับกลับมาใช้ได้</p>
     </section>
-    <form id="profile-form" novalidate><label class="form-field">ชื่อในโลก GERARAI<input name="name" required maxlength="40" value="${esc(pr.display_name || '')}" placeholder="เช่น Amber"></label><label class="form-field">Traveler ID (@username)<input name="handle" maxlength="30" placeholder="เช่น akanid_84" value="${esc(pr.handle || '')}" autocapitalize="off" autocomplete="username" spellcheck="false"></label><p class="form-help">ชื่อเล่นซ้ำกันได้ แต่ Traveler ID ต้องไม่ซ้ำ · ใช้ a–z 0–9 _ และ . ยาว 3–30 ตัว</p><label class="form-field">เรื่องราวสั้น ๆ ของตัวละคร<textarea name="bio" maxlength="220">${esc(pr.bio || '')}</textarea></label><p class="form-error" role="alert" hidden></p><div class="form-submit"><button class="primary" type="submit">บันทึกชื่อและโปรไฟล์</button></div></form>`);
+    <form id="profile-form" novalidate><label class="form-field">ชื่อในโลก GERARAI<input name="name" required maxlength="40" value="${esc(pr.display_name || '')}" placeholder="เช่น Amber"></label><label class="form-field">Traveler ID (@username)<input name="handle" maxlength="30" placeholder="เช่น akanid_84" value="${esc(pr.handle || '')}" autocapitalize="off" autocomplete="username" spellcheck="false"></label><p class="form-help">ชื่อเล่นซ้ำกันได้ แต่ Traveler ID ต้องไม่ซ้ำ · ใช้ a–z 0–9 และ _ ยาว 3–20 ตัว (@ID ที่ตั้งไว้ก่อนหน้านี้ใช้ต่อได้)</p><label class="form-field">เรื่องราวสั้น ๆ ของตัวละคร<textarea name="bio" maxlength="220">${esc(pr.bio || '')}</textarea></label><p class="form-error" role="alert" hidden></p><div class="form-submit"><button class="primary" type="submit">บันทึกชื่อและโปรไฟล์</button></div></form>`);
     const form = document.getElementById('profile-form');
     const showError = msg => { const el = form.querySelector('.form-error'); el.textContent = msg; el.hidden = !msg; };
     const status = document.getElementById('avatar-status');
@@ -832,6 +832,11 @@
     finally { if (seq === FF.seq) FF.loading = false; }
     drawFeed();
   }
+  // Open Beta demo cleanup (2026-10-09): no sample story bubbles or sample "cities to visit" card in member mode; only the
+  // working "Your Story" (opens the Story composer) stays.
+  storiesMarkup = () => `<div class="panel stories"><button class="story" data-action="compose"><span class="story-ring mine">${icon('plus')}</span><small>Your Story</small></button></div>`;
+  const demoRightRail = rightRail;
+  rightRail = () => demoRightRail().replace(/<section class="panel rail-section">[\s\S]*?<\/section>/, '');
   feedPosts = () => feedList();                                 // member Feed = Following only (no sample or global Stories)
   const baseRenderFeed = renderFeed;
   renderFeed = function () {

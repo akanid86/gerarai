@@ -8,3 +8,14 @@
 /* Reserve a separate row for level, below the complete avatar artwork. */
 .profile-progress .progress-avatar{display:flex;flex-direction:column;align-items:center;gap:8px}
 .profile-progress .progress-avatar>.progress-level-chip{position:static;transform:none;flex-shrink:0}
+
+/* Character Creator selectors (2026-10-09): ‹ value › steppers only; the native <select> stays hidden as the data holder. */
+.gerdey-stepper{min-width:0;gap:4px}.gerdey-label{font-size:13px;color:#42584b}
+.gerdey-step-row{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;align-items:center;gap:6px}
+.gerdey-step{width:44px;height:44px;border:1px solid #c7cfbd;border-radius:12px;background:#fffaf0;color:#36584a;font-size:24px;line-height:1;cursor:pointer;touch-action:manipulation}
+.gerdey-step:active{background:#efe6d2}.gerdey-step:disabled{opacity:.45;cursor:not-allowed}
+.gerdey-value{display:flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:4px 8px;border:1px solid #c7cfbd;border-radius:12px;background:#fff;color:#203448;font-size:14px;text-align:center;overflow:hidden}
+.gerdey-value b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.gerdey-value small{color:#9aa69e;font-size:11px;font-weight:400;flex-shrink:0}
+.gerdey-value i{display:inline-block;width:14px;height:14px;border-radius:50%;background:var(--swatch);border:1px solid rgba(0,0,0,.15);flex-shrink:0}
+.gerdey-stepper.is-disabled .gerdey-value{opacity:.55}
+@media(max-width:600px){.gerdey-editor section:not([hidden]){gap:8px}.gerdey-tabs{margin:8px 0 10px}.gerdey-step,.gerdey-step-row{min-width:0}.gerdey-value{font-size:15px}}
