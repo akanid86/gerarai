@@ -13,10 +13,10 @@
   const startHash = location.hash;
   const cameFromAuthLink = /access_token=|error_description=/.test(startHash);
   const authLinkError = /error_description=/.test(startHash);
-  if (cameFromAuthLink) route = 'feed';
-  // app.js renders before this public-profile hook and falls back to feed.
-  // Preserve the requested profile on a cold shared-link load.
-  else if (startHash.startsWith('#u/')) route = startHash.slice(1);
+  const Gate = window.GerarAIGate;
+  // Open Beta gate: until a session is confirmed every non-legal route (auth callback, deep links such as #u/…) stays on
+  // the landing; app.js remembered the requested route and Gate.mount() opens it after sign-in.
+  route = Gate.routeFor(cameFromAuthLink ? 'gate' : (decodeURIComponent(startHash.slice(1)) || 'feed'));
 
   const seedLive = seedPosts.map(p => ({ ...p, own: false }));
   const SAMPLE_MSG = 'นี่คือเรื่องราวตัวอย่าง กดถูกใจ บันทึก หรือแสดงความคิดเห็นไม่ได้';
@@ -41,6 +41,53 @@
   const syncPlaces = () => { places.splice(0, places.length, ...(Remote.places || [])); };
   const baseReload = Remote.reload;
   Remote.reload = async function (...args) { const r = await baseReload.apply(this, args); syncPlaces(); return r; };
+
+  /* ---------- Open Beta gate: no member data without a confirmed session ---------- */
+  // Signed out: nothing but the public policy status (legal pages) is requested — no places, Stories, Discoveries,
+  // profiles or progression. Signed in: the stored session is first confirmed with the Auth server (/auth/v1/user);
+  // an explicitly rejected session (401/403) is signed out instead of loading data.
+  const AUTH_KEY = (() => { try { return 'sb-' + new URL(window.GERARAI_CONFIG.supabase.url).hostname.split('.')[0] + '-auth-token'; } catch { return ''; } })();
+  function clearMemberState() {
+    Remote.profile = null; Remote.places = []; Remote.placeIds = {};
+    Remote.data = { posts: [], liked: [], saved: [], savedPlaces: [], following: [], blocked: [] };
+    Remote.classProgress = []; Remote.classCatalog = [];
+    Remote.progression = { available: false, state: null, badges: [], catalog: [], summary: null };
+    syncPlaces();
+  }
+  async function sessionRejected() {
+    let token = '';
+    try { token = JSON.parse(localStorage.getItem(AUTH_KEY) || 'null')?.access_token || ''; } catch { token = ''; }
+    if (!token) return false;                     // in-memory session just issued by the Auth server (link / code)
+    try {
+      const cfg = window.GERARAI_CONFIG.supabase;
+      const res = await fetch(cfg.url + '/auth/v1/user', { headers: { apikey: cfg.anonKey, Authorization: 'Bearer ' + token }, cache: 'no-store' });
+      if (res.status === 401 || res.status === 403) return true;
+      if (!res.ok) return false;
+      const u = await res.json().catch(() => null);
+      return !!(u?.id && Remote.user?.id && u.id !== Remote.user.id);
+    } catch { return false; }                     // network: the data requests below fail on their own
+  }
+  async function anonymousReload() {
+    clearMemberState();
+    await Remote.loadOnboarding().catch(err => { Remote.onboarding = { available: null, status: null, error: err }; console.warn('[GERARAI] onboarding status:', err?.code, err?.message); });
+  }
+  const memberReload = Remote.reload;
+  Remote.reload = async function (...args) {
+    if (!Remote.user) return anonymousReload();
+    if (await sessionRejected()) {
+      console.warn('[GERARAI] stored session rejected by the Auth server — signing out');
+      await anonymousReload();
+      try { await Remote.signOut(); } catch { /* the local session is dropped either way */ }
+      return;
+    }
+    if (!Remote.user) return anonymousReload();
+    return memberReload.apply(this, args);
+  };
+  window.addEventListener('gerarai:identity-changing', () => {
+    publicCache.clear();
+    if (!Remote.user) { clearMemberState(); if (Gate.open) Gate.enter(); }   // sign-out / session expiry: back to the gate now
+    else if (!Gate.open) Gate.setStatus('entering');
+  });
   const PD_LABEL = { private: 'ไม่แสดง', area: 'แสดงแค่พื้นที่', venue: 'แสดงชื่อสถานที่' };
   // own = the Story's current link (edit form) from story_places, so a link outside the catalogue is kept, not wiped (G10)
   function placeOptions(selected, own) {
@@ -165,6 +212,7 @@
 
   const baseRenderNav = renderNav;
   renderNav = function () {
+    if (!Gate.open) return;
     baseRenderNav();
     const btn = document.querySelector('.avatar-header');
     if (Remote.user) { btn.innerHTML = myAvatar(); btn.setAttribute('aria-label', 'เปิดโปรไฟล์ของฉัน'); btn.classList.remove('signed-out'); }
@@ -603,6 +651,7 @@
   }
   const baseRender = render;
   render = function () {
+    if (Gate.open && !Remote.user) { clearMemberState(); Gate.enter(); return; }
     if (route.startsWith('u/')) {
       if (map) { map.remove(); map = null; }
       renderNav(); renderPublicProfile(route.slice(2)); decorateIcons(main); return;
@@ -725,26 +774,30 @@
 
   /* ---------- start ---------- */
   Remote.onChange = (event, err) => {
-    if (event === 'error') { fail(err); return; }
-    if (event === 'SIGNED_IN') {
-      if (dialog.open && /เข้าสู่ระบบ|เช็กอีเมล/.test(document.getElementById('dialog-title').textContent)) closeDialog();
-      render(); toast(`ยินดีต้อนรับ ${Remote.profile?.display_name || ''}`.trim()); maybeOfferMigration();
-    } else if (event === 'SIGNED_OUT') { render(); toast('ออกจากระบบแล้ว'); }
-    else render();
+    if (event === 'error') { fail(err); if (!Remote.user) { if (Gate.open) Gate.enter(); } else if (!Gate.open) Gate.setStatus('error'); return; }
+    if (event === 'SIGNED_IN' && Remote.user) {
+      if (dialog.open && /เข้าสู่ระบบ|เช็กอีเมล|รหัสหรือลิงก์/.test(document.getElementById('dialog-title').textContent)) closeDialog();
+      Gate.setStatus('ready'); if (Gate.open) render(); else Gate.mount();
+      toast(`ยินดีต้อนรับ ${Remote.profile?.display_name || ''}`.trim()); maybeOfferMigration();
+    } else if (!Remote.user) {
+      Gate.setStatus('ready'); if (Gate.open) Gate.enter(); else render();
+      if (event === 'SIGNED_OUT') toast('ออกจากระบบแล้ว');
+    } else { if (Gate.open) render(); else Gate.mount(); }
   };
   let startError = null;
   console.info('[GERARAI] v0.7.0-dev · backend=supabase · project=' + (window.GERARAI_CONFIG.supabase?.url || '(none)') + (Remote.configProblem ? ' · CONFIG PROBLEM: ' + Remote.configProblem : ''));
   render();
   Remote.init().then(() => {
     console.info('[GERARAI] ระบบสมาชิกพร้อม · ' + (Remote.user ? 'เข้าสู่ระบบในชื่อ ' + Remote.user.email : 'ยังไม่เข้าสู่ระบบ') + ' · โพสต์จริง ' + Remote.data.posts.length + ' · สถานที่ ' + Object.keys(Remote.placeIds).length);
-    if (cameFromAuthLink) history.replaceState(null, '', location.pathname + location.search + '#feed');
-    render();
+    if (cameFromAuthLink) history.replaceState(null, '', location.pathname + location.search + (Remote.user ? '#feed' : ''));
+    Gate.setStatus('ready');
+    if (Remote.user) Gate.mount(); else render();
     if (cameFromAuthLink && Remote.user) toast(`ยินดีต้อนรับ ${Remote.profile?.display_name || ''}`.trim());
     if (authLinkError) toast('ลิงก์เข้าสู่ระบบหมดอายุหรือถูกใช้ไปแล้ว ขอลิงก์ใหม่อีกครั้ง');
     maybeOfferMigration();
   }).catch(err => {
     startError = err; console.error('[GERARAI] เริ่มระบบสมาชิกไม่สำเร็จ:', err);
-    toast(Remote.errorText(err)); render();
-    document.body.insertAdjacentHTML('afterbegin', `<div class="offline-banner" role="alert">${esc(err?.code === 'config' ? 'ตั้งค่าระบบสมาชิกไม่ถูกต้อง: ' + Remote.errorText(err) : 'เชื่อมต่อระบบสมาชิกไม่ได้')} · ตอนนี้แสดงเฉพาะข้อมูลตัวอย่าง และยังโพสต์ไม่ได้ <button class="text-button" onclick="location.reload()">ลองใหม่</button></div>`);
+    Gate.setStatus('error'); toast(Remote.errorText(err)); render();
+    document.body.insertAdjacentHTML('afterbegin', `<div class="offline-banner" role="alert">${esc(err?.code === 'config' ? 'ตั้งค่าระบบสมาชิกไม่ถูกต้อง: ' + Remote.errorText(err) : 'เชื่อมต่อระบบสมาชิกไม่ได้')} · ยังเข้าสู่ระบบไม่ได้ในขณะนี้ <button class="text-button" onclick="location.reload()">ลองใหม่</button></div>`);
   });
 })();

@@ -34,7 +34,7 @@
   }
 
   /* D3 sidebar flowers: only when the gap above the sidebar footer is real */
-  const sidebar = document.querySelector('.sidebar');
+  const sidebar = window.GerarAIGate?.shellQuery('.sidebar') || document.querySelector('.sidebar');   // detached while the Open Beta gate is shown
   const flowers = sidebar ? deco('vd-sidebar-scene vd-deco', 'sway') : null;
   if (flowers) sidebar.appendChild(flowers);
   function placeSidebar() {

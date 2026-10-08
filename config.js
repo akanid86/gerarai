@@ -10,7 +10,9 @@
  * ห้ามใส่ service_role key, รหัสผ่าน หรือ secret ใด ๆ ในไฟล์นี้เด็ดขาด
  */
 window.GERARAI_CONFIG = Object.freeze({
-  backend: new URLSearchParams(location.search).get('backend') === 'local' ? 'local' : 'supabase',
+  // Open Beta: gerarai.com always runs the member backend behind the sign-in gate; the ?backend=local offline prototype
+  // (sample data, no accounts) is available only on other hosts (development).
+  backend: !/(^|\.)gerarai\.com$/i.test(location.hostname) && new URLSearchParams(location.search).get('backend') === 'local' ? 'local' : 'supabase',
   /*
    * Map layers stay separate. Discovery is GERARAI-owned data; Google Places
    * is an optional reference layer and must never be bulk-copied into the

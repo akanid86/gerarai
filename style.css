@@ -195,3 +195,27 @@ span.emg-fresh{font:700 .62rem/1 system-ui,sans-serif;padding:3px 6px;border-rad
 .detail-hero-noimg{display:grid;place-items:center;height:200px;background:linear-gradient(135deg,#eef4ec,#f7f3e8)}
 .detail-hero-noimg .detail-hero-icon{font-size:3.2rem;transform:translateY(-18px)}
 @media (max-width:700px){.detail-hero-noimg{height:170px}}
+/* Open Beta sign-in gate (app.js Gate): the app shell is never shown before a confirmed session.
+ * Before JavaScript runs the static shell is hidden; app.js then detaches it (member mode) or reveals it (?backend=local). */
+html:not(.gerarai-app) body>.topbar,html:not(.gerarai-app) body>.app-layout,html:not(.gerarai-app) body>.bottom-nav{display:none!important}
+.gate{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;background:linear-gradient(180deg,#eef4ff 0,var(--bg) 340px)}
+.gate-top{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px max(16px,4vw);background:#fff;border-bottom:1px solid var(--border)}
+.gate-top .brand{min-width:0}.gate-top .brand-icon img{width:60px;height:auto}
+.gate-badge{flex-shrink:0;padding:6px 12px;border-radius:999px;background:var(--soft);color:var(--blue-dark);font-weight:700;font-size:.82rem;letter-spacing:.02em}
+.gate>#main{flex:1;width:100%;max-width:880px;margin:0 auto;padding:28px 16px 40px;min-width:0}
+.gate-landing{display:flex;justify-content:center}
+.gate-card{width:100%;max-width:560px;background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:36px 28px;text-align:center;box-shadow:0 18px 40px rgba(16,27,48,.06)}
+.gate-mark{margin:0 auto 12px;width:120px;height:auto}
+.gate-kicker{display:inline-block;margin-bottom:6px;padding:4px 12px;border-radius:999px;background:#fff4e2;color:#a85f00;font-weight:700;font-size:.8rem;letter-spacing:.04em}
+.gate-card h1{font-family:Arial,sans-serif;font-size:2.2rem;font-weight:800;letter-spacing:-.7px}
+.gate-tagline{color:var(--muted);margin-top:2px}
+.gate-lead{margin:18px auto 0;max-width:440px;line-height:1.75}
+.gate-actions{margin-top:24px;display:flex;justify-content:center}
+.gate-actions .primary{min-height:48px;padding:0 24px;font-size:1rem;width:100%;max-width:380px}
+.gate-help,.gate-legal-note{margin-top:14px;font-size:.88rem;color:var(--muted);line-height:1.7}
+.gate-legal-note a,.gate-links a{color:var(--blue);text-decoration:underline;text-underline-offset:2px}
+.gate-status{margin-top:12px;min-height:1.4em;font-size:.9rem;color:var(--blue-dark)}
+.gate-status:empty{display:none}
+.gate-foot{padding:18px 16px 28px;text-align:center;color:var(--muted)}
+.gate-links{display:flex;flex-wrap:wrap;justify-content:center;gap:8px 18px;margin-bottom:10px;font-size:.88rem}
+@media (max-width:600px){.gate-top .brand-wordmark small{display:none}.gate-card{padding:28px 18px}.gate-card h1{font-size:1.9rem}}

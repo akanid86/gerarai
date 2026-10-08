@@ -54,8 +54,8 @@ function toast(message){const el=document.getElementById('toast');const host=dia
 function avatarInner(post){return esc(post.avatar||post.author[0]);}
 function avatar(post,cls=''){const demo=post.author==='Mint'&&!post.remote;return `<span class="avatar ${cls}" ${demo?'':`aria-hidden="true"`}>${demo?`<img src="${imgs.bangkok}" alt="">`:avatarInner(post)}</span>`;}
 function navMarkup(mobile=false){const items=[['feed','home','หน้าหลัก'],['explore','search','สำรวจ'],['map','map','แผนที่'],['profile','user','โปรไฟล์']];return items.map(([id,ic,label],i)=>`${mobile&&i===2?`<button class="bottom-compose" data-action="compose" aria-label="เพิ่มเรื่องราว">${icon('plus')}</button>`:''}<button class="${mobile?'bottom-item':'nav-item'} ${route.split('?')[0]===id||(route.startsWith('place/')&&id==='map')?'active':''}" data-nav="${id}" ${route.split('?')[0]===id?'aria-current="page"':''}>${icon(ic)}<span>${label}</span></button>`).join('');}
-function renderNav(){document.getElementById('desktop-nav').innerHTML=navMarkup();document.getElementById('bottom-nav').innerHTML=navMarkup(true);document.getElementById('saved-count').textContent=countSaved();document.querySelector('.avatar-header').textContent=meInitial();}
-function navigate(path){if(location.hash==='#'+path){route=path;render();}else location.hash=path;}
+function renderNav(){if(!Gate.open)return;document.getElementById('desktop-nav').innerHTML=navMarkup();document.getElementById('bottom-nav').innerHTML=navMarkup(true);document.getElementById('saved-count').textContent=countSaved();document.querySelector('.avatar-header').textContent=meInitial();}
+function navigate(path){if(location.hash==='#'+path){route=gateRoute(path);render();}else location.hash=path;}
 function goMap(cat='all',city=''){category=cat;cityFilter=city;query='';document.getElementById('search-input').value='';navigate('map');}
 function categoryMarkup(selected='all'){return `<div class="category-grid">${categories.map(c=>`<button class="category-chip ${selected===c.id?'active':''}" data-category="${c.id}" aria-pressed="${selected===c.id}"><span class="emoji" aria-hidden="true">${window.GerarAICategoryIcons.render(c.id,c.emoji)}</span>${c.name}</button>`).join('')}</div>`;}
 function storiesMarkup(){return `<div class="panel stories"><button class="story" data-action="compose"><span class="story-ring mine">${icon('plus')}</span><small>Your Story</small></button>${[['Bangkok','กรุงเทพฯ',imgs.bangkok],['Chiang Mai','เชียงใหม่',imgs.temple],['Slow Life','ธรรมชาติ',imgs.mountain],['Nimman','นิมมาน',imgs.pharmacy],['Explore','ออกสำรวจ',imgs.temple]].map(([label,city,img])=>`<button class="story" data-story="${city}"><span class="story-ring"><img src="${img}" alt="${city}"></span><small>${label}</small></button>`).join('')}</div>`;}
@@ -81,7 +81,7 @@ function profilePhotos(){const posts=allPosts().filter(p=>p.own&&p.image);return
 function renderProfile(){main.innerHTML=`<div class="profile-wrap"><div class="profile-cover"><span class="cover-caption">EXPLORE<br>MORE.<br>REAL LIFE.</span></div><section class="profile-card"><div class="profile-topline"><div class="avatar profile-avatar">${esc(state.profile.name[0])}</div><div class="profile-buttons"><button class="secondary" data-action="safety" aria-label="ความเป็นส่วนตัวและความปลอดภัย">${icon('shield')}<span>ความปลอดภัย</span></button><button class="secondary" data-action="edit-profile">${icon('settings')}แก้ไขโปรไฟล์</button></div></div><h1 class="profile-name">${esc(state.profile.name)}<span class="verified" aria-label="เครื่องหมายตัวอย่าง">✓</span></h1><p class="profile-handle">@baitoeyy · โปรไฟล์ทดลอง</p><p class="profile-bio">${esc(state.profile.bio).replace(/\n/g,'<br>')}</p><div class="profile-meta"><span>${icon('pin')}Thailand</span><span>${icon('calendar')}1998</span><span>${icon('globe')}9 ประเทศ</span></div><div class="profile-stats"><div><b>1.2K</b><small>ผู้ติดตาม</small></div><div><b>${356+state.following.length}</b><small>กำลังติดตาม</small></div><div><b>87</b><small>สถานที่ที่ไป</small></div><div><b>42</b><small>เมือง</small></div></div><div class="profile-achievements">${levelMarkup()}${badgesMarkup(true)}</div></section><div class="profile-tabs" role="tablist" aria-label="เนื้อหาโปรไฟล์">${[['posts','โพสต์'],['visited','แผนที่ชีวิต'],['places','สถานที่'],['album','อัลบั้ม'],['saved','บันทึก']].map(([key,name])=>`<button class="tab ${profileTab===key?'active':''}" role="tab" aria-selected="${profileTab===key}" data-profile-tab="${key}">${name}</button>`).join('')}</div><div id="profile-content">${profileTab==='posts'||profileTab==='album'?profilePhotos():profileTab==='saved'?`<div class="saved-layout">${savedMarkup()}</div>`:profileTab==='places'?`<div class="explore-grid">${places.some(p=>isOn('savedPlaces',p.id))?places.filter(p=>isOn('savedPlaces',p.id)).map(placeCard).join(''):places.slice(0,3).map(placeCard).join('')}</div>`:`<div class="panel rail-section"><h2 class="section-title">ทุกที่ที่ไป คือส่วนหนึ่งของเรา</h2><p class="form-help">เส้นทางตัวอย่าง: กรุงเทพฯ → เชียงใหม่</p><div class="explore-grid">${[places[1],places[2]].map(placeCard).join('')}</div><button class="primary" data-nav="map">เปิดแผนที่การผจญภัย</button></div>`}</div></div>`;}
 function savedMarkup(){const saved=allPosts().filter(p=>isOn('saved',p.id));return saved.length?saved.map(postMarkup).join(''):empty('เก็บเรื่องราวที่อยากกลับมาดู','กดรูปที่คั่นหนังสือใต้โพสต์ แล้วเรื่องราวจะอยู่ตรงนี้',`<button class="primary" data-nav="feed">ไปที่ฟีดเรื่องราว</button>`);}
 function renderSaved(){main.innerHTML=`<div class="page-heading"><div><h1>เรื่องราวที่บันทึกไว้</h1><p>มุมโปรดสำหรับวันถัดไป</p></div></div><div class="saved-layout">${savedMarkup()}</div>`;}
-function render(){if(map){map.remove();map=null;}renderNav();if(route==='feed')renderFeed();else if((route==='map'||route.startsWith('map?')))renderMap();else if(route==='explore')renderExplore();else if(route==='profile')renderProfile();else if(route==='saved')renderSaved();else if(route==='privacy'||route==='terms')renderLegal(route);else if(route.startsWith('place/'))renderPlace(route.split('/')[1]);else if(route.startsWith('post/')){const p=allPosts().find(p=>p.id===route.split('/')[1]);main.innerHTML=`<div class="saved-layout"><button class="back-link" data-nav="feed">${icon('back')}กลับไปเรื่องราว</button>${p?postMarkup(p):empty('ไม่พบเรื่องราว','เรื่องราวที่สร้างในต้นแบบจะอยู่เฉพาะเบราว์เซอร์ที่บันทึกไว้')}</div>`;}else{route='feed';renderFeed();}decorateIcons(main);}
+function render(){if(map){map.remove();map=null;}if(Gate.enabled&&!Gate.open&&route!=='gate'&&!Gate.isPublic(route))route='gate';if(route==='gate'){if(Gate.open){route='feed';}else{renderGate();return;}}renderNav();if(route==='feed')renderFeed();else if((route==='map'||route.startsWith('map?')))renderMap();else if(route==='explore')renderExplore();else if(route==='profile')renderProfile();else if(route==='saved')renderSaved();else if(route==='privacy'||route==='terms')renderLegal(route);else if(route.startsWith('place/'))renderPlace(route.split('/')[1]);else if(route.startsWith('post/')){const p=allPosts().find(p=>p.id===route.split('/')[1]);main.innerHTML=`<div class="saved-layout"><button class="back-link" data-nav="feed">${icon('back')}กลับไปเรื่องราว</button>${p?postMarkup(p):empty('ไม่พบเรื่องราว','เรื่องราวที่สร้างในต้นแบบจะอยู่เฉพาะเบราว์เซอร์ที่บันทึกไว้')}</div>`;}else{route='feed';renderFeed();}decorateIcons(main);}
 function openDialog(title,body){dialogReturnFocus=document.activeElement;document.getElementById('dialog-title').textContent=title;dialogContent.innerHTML=body;decorateIcons(dialogContent);if(!dialog.open)dialog.showModal();}
 function closeDialog(){dialog.close();dialogReturnFocus?.focus?.();}
 dialog.addEventListener('click',e=>{if(e.target===dialog){const r=dialog.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)closeDialog();}});
@@ -155,9 +155,68 @@ document.addEventListener('click',async e=>{const b=e.target.closest('button,[da
  else if(action==='delete-post'){openDialog('ลบเรื่องราวนี้?',`<p class="form-help">เรื่องราวนี้จะถูกลบออกจากเบราว์เซอร์ของคุณ</p><div class="form-submit"><button class="secondary" data-action="close-dialog">ยกเลิก</button><button class="primary" data-action="confirm-delete" data-id="${id}">ลบเรื่องราว</button></div>`);}
  else if(action==='confirm-delete'){state.posts=state.posts.filter(p=>p.id!==id);state.saved=state.saved.filter(x=>x!==id);state.liked=state.liked.filter(x=>x!==id);delete state.comments[id];persist();closeDialog();render();toast('ลบเรื่องราวแล้ว');}
 });
-document.addEventListener('keydown',e=>{if(e.key==='/'&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)&&!dialog.open){e.preventDefault();if(innerWidth>700)document.getElementById('search-input').focus();else document.querySelector('.mobile-search').click();}});
-window.addEventListener('hashchange',()=>{if(dialog.open)dialog.close();route=location.hash.slice(1)||'feed';render();window.scrollTo({top:0,behavior:'instant'});});
+document.addEventListener('keydown',e=>{if(Gate.open&&e.key==='/'&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)&&!dialog.open){e.preventDefault();if(innerWidth>700)document.getElementById('search-input').focus();else document.querySelector('.mobile-search').click();}});
+window.addEventListener('hashchange',()=>{if(dialog.open)dialog.close();route=gateRoute(location.hash.slice(1)||'feed');render();window.scrollTo({top:0,behavior:'instant'});});
 /* แสดงเวอร์ชันและโหมดให้เห็นชัด เพื่อไม่สับสนกับไฟล์รุ่นเก่า */
 const APP_VERSION='v0.7.0-dev';document.querySelector('.sidebar-bottom small').textContent=`GERARAI © 2026 · ${APP_VERSION} · ${CONFIG.backend==='local'?'โหมดต้นแบบออฟไลน์':'ระบบสมาชิก'}`;
 if(CONFIG.backend==='local'){const u=new URL(location.href);u.searchParams.delete('backend');document.body.insertAdjacentHTML('afterbegin',`<div class="offline-banner local-banner" role="note">โหมดต้นแบบออฟไลน์ · ข้อมูลเก็บเฉพาะเครื่องนี้ ไม่มีสมาชิก <a class="text-button" href="${esc(u.href)}">เปิดโหมดสมาชิก</a></div>`);}
-route=location.hash.slice(1)||'feed';decorateIcons();render();
+/* ---------- Open Beta: authenticated-only gate (member mode) ----------
+ * Signed-out visitors get only the GERARAI Open Beta landing + the public legal/help pages. The app shell (top bar,
+ * sidebar, navigation, bottom bar) is DETACHED from the document until live.js confirms a session; #main lives inside the
+ * gate meanwhile (legal pages render there). Any other route, including deep links, shows the landing; the requested
+ * route is remembered and opened after sign-in. live.js mounts the app (Gate.mount) once the session is confirmed and
+ * the member data is loaded, and returns here (Gate.enter) on sign-out / session expiry. The ?backend=local prototype has
+ * no gate (config.js never allows it on gerarai.com). */
+const Gate=(()=>{
+ const enabled=CONFIG.backend==='supabase';
+ const PUBLIC=/^(terms|community|privacy|emergency-safety|location-safety|contact|appeal|copyright|data-rights)(\?|$)/;
+ const AUTH_HASH=/(^|[&?])(access_token|refresh_token|error_description|error|code|token_hash)=/;
+ const shell=['.topbar','.app-layout','#bottom-nav'].map(sel=>document.querySelector('body > '+sel)).filter(Boolean);
+ const layout=document.querySelector('.app-layout');
+ let open=!enabled,wanted='',status='checking',el=null;
+ const isPublic=r=>PUBLIC.test(String(r||''));
+ function routeFor(r){r=String(r||'feed');if(open)return r==='gate'?'feed':r;if(isPublic(r))return r;if(r!=='gate'&&!AUTH_HASH.test(r))wanted=r;return 'gate';}
+ const LINKS=[['terms','ข้อกำหนดการใช้บริการ'],['privacy','ประกาศความเป็นส่วนตัว'],['community','มาตรฐานชุมชน'],['emergency-safety','ข้อควรรู้เรื่องข้อมูลสถานการณ์'],['location-safety','ข้อควรรู้เรื่องการแชร์ตำแหน่ง'],['contact','ติดต่อ GERARAI']];
+ function build(){
+  if(el)return el;
+  el=document.createElement('div');el.id='gate';el.className='gate';
+  el.innerHTML=`<header class="gate-top"><a class="brand gate-brand" href="#gate" aria-label="GERARAI Open Beta"><span class="brand-symbol brand-icon" aria-hidden="true"><img src="assets/gerarai-mark.png" srcset="assets/gerarai-mark.png 1x, assets/gerarai-mark@2x.png 2x" width="240" height="144" alt="" decoding="async"></span><span class="brand-wordmark"><strong>GERARAI</strong><small>Real Life Social Adventure</small></span></a><span class="gate-badge">Open Beta</span></header><footer class="gate-foot"><nav class="gate-links" aria-label="เอกสารและความช่วยเหลือ">${LINKS.map(([r,l])=>`<a href="#${r}">${l}</a>`).join('')}</nav><small>GERARAI © 2026 · Open Beta</small></footer>`;
+  return el;
+ }
+ function enter(start=false){
+  open=false;if(!start)wanted='';
+  if(dialog.open)dialog.close();
+  if(map){map.remove();map=null;}
+  query='';category='all';cityFilter='';feedTab='for-you';profileTab='posts';detailTab='overview';
+  const box=build();
+  shell.forEach(n=>n.remove());
+  if(!box.isConnected)document.body.insertBefore(box,dialog);
+  box.insertBefore(main,box.querySelector('.gate-foot'));
+  main.innerHTML='';
+  document.documentElement.classList.remove('gerarai-app');document.documentElement.classList.add('gerarai-gated');
+  const h=decodeURIComponent(location.hash.slice(1));
+  if(isPublic(h))route=h;else{route='gate';if(!start&&location.hash&&!AUTH_HASH.test(h))history.replaceState(null,'',location.pathname+location.search);}
+  render();
+ }
+ function mount(){
+  if(open)return;
+  open=true;
+  const target=isPublic(route)?route:(wanted||'feed');wanted='';
+  el?.remove();
+  shell.forEach(n=>document.body.insertBefore(n,dialog));
+  layout.appendChild(main);main.innerHTML='';
+  document.documentElement.classList.remove('gerarai-gated');document.documentElement.classList.add('gerarai-app');
+  route=target;
+  if(location.hash!=='#'+target)history.replaceState(null,'',location.pathname+location.search+'#'+target);
+  render();
+ }
+ function setStatus(s){status=s;if(!open&&route==='gate')renderGate();}
+ function shellQuery(sel){for(const n of shell){if(n.matches(sel))return n;const q=n.querySelector(sel);if(q)return q;}return null;}
+ if(!enabled)document.documentElement.classList.add('gerarai-app');
+ return Object.freeze({enabled,get open(){return open;},get status(){return status;},get wanted(){return wanted;},isPublic,routeFor,enter,mount,setStatus,shellQuery,links:LINKS});
+})();
+window.GerarAIGate=Gate;
+function gateRoute(r){return Gate.routeFor(r);}
+const GATE_STATUS={checking:'กำลังตรวจสอบการเข้าสู่ระบบ…',entering:'กำลังเข้าสู่ GERARAI…',ready:'',error:'เชื่อมต่อระบบสมาชิกไม่ได้ในขณะนี้ ลองโหลดหน้าใหม่อีกครั้ง'};
+function renderGate(){main.innerHTML=`<section class="gate-landing" aria-labelledby="gate-title"><div class="gate-card"><img class="gate-mark" src="assets/gerarai-mark.png" srcset="assets/gerarai-mark.png 1x, assets/gerarai-mark@2x.png 2x" width="120" height="72" alt=""><p class="gate-kicker">Open Beta</p><h1 id="gate-title">GERARAI</h1><p class="gate-tagline">Real Life Social Adventure</p><p class="gate-lead">แบ่งปันเรื่องราวการเดินทางและการค้นพบสถานที่ในชีวิตจริง ช่วง Open Beta ใช้งานได้เฉพาะสมาชิกที่เข้าสู่ระบบแล้ว</p><div class="gate-actions"><button class="primary gate-signin" data-action="signin">เข้าสู่ระบบ / สมัครสมาชิกด้วยอีเมล</button></div><p class="gate-help">ไม่ต้องตั้งรหัสผ่าน เราจะส่งลิงก์และรหัสเข้าสู่ระบบไปที่อีเมลของคุณ ถ้ายังไม่มีบัญชีจะสร้างให้อัตโนมัติ</p><p class="gate-status" role="status" aria-live="polite">${esc(GATE_STATUS[Gate.status]||'')}</p><p class="gate-legal-note">ก่อนเริ่มโพสต์หรือโต้ตอบ คุณจะได้อ่านและยืนยัน<a href="#terms">ข้อกำหนดการใช้บริการ</a>และ<a href="#community">มาตรฐานชุมชน</a> และรับทราบ<a href="#privacy">ประกาศความเป็นส่วนตัว</a></p></div></section>`;}
+route=gateRoute(location.hash.slice(1)||'feed');decorateIcons();if(Gate.enabled)Gate.enter(true);else render();
