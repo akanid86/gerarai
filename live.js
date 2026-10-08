@@ -23,7 +23,6 @@
   const stop = e => { e.preventDefault(); e.stopImmediatePropagation(); };
   const busy = (btn, on, text) => { if (!btn) return; if (on) { btn.dataset.label = btn.textContent; btn.textContent = text; btn.disabled = true; } else { btn.textContent = btn.dataset.label || btn.textContent; btn.disabled = false; } };
   const fail = err => { console.error('[GERARAI]', err); toast(err instanceof Error && /พิกัด|Discovery|ความละเอียด|แผนที่/.test(err.message) ? err.message : Remote.errorText(err)); };
-  const HANDLE_RE = /^[a-z0-9_.]{3,30}$/;
   const extractTags = body => [...new Set([...body.matchAll(/#([\p{L}\p{M}\p{N}_]+)/gu)].map(m => m[1]))].slice(0, 10);
 
   /* ---------- hooks ---------- */
@@ -81,10 +80,13 @@
       return;
     }
     if (!Remote.user) return anonymousReload();
-    return memberReload.apply(this, args);
+    resetFeed();
+    const out = await memberReload.apply(this, args);
+    resetFeed();
+    return out;
   };
   window.addEventListener('gerarai:identity-changing', () => {
-    publicCache.clear();
+    publicCache.clear(); resetFeed();
     if (!Remote.user) { clearMemberState(); if (Gate.open) Gate.enter(); }   // sign-out / session expiry: back to the gate now
     else if (!Gate.open) Gate.setStatus('entering');
   });
@@ -432,7 +434,7 @@
       <div id="pixel-editor-wrap" class="pixel-editor-wrap">${Character.editorMarkup(workingSpec)}<div class="character-editor-actions"><button class="secondary" type="button" id="pixel-random">🎲 สุ่มตัวละคร</button><button class="secondary" type="button" id="pixel-reset">คืนค่าที่บันทึก</button><button class="secondary" type="button" id="pixel-undo">ย้อนกลับ</button><button class="primary" type="button" id="pixel-save">ใช้ตัวละครนี้</button></div></div>
       <p class="form-help" id="avatar-status">Pixel Character เป็นตัวตนในโลก GERARAI ส่วนรูปจริงยังเก็บแยกกันและสลับกลับมาใช้ได้</p>
     </section>
-    <form id="profile-form" novalidate><label class="form-field">ชื่อในโลก GERARAI<input name="name" required maxlength="40" value="${esc(pr.display_name || '')}" placeholder="เช่น Amber"></label><label class="form-field">Traveler ID (@username)<input name="handle" maxlength="30" placeholder="เช่น akanid84" value="${esc(pr.handle || '')}" autocapitalize="off" autocomplete="username" spellcheck="false"></label><p class="form-help">ชื่อเล่นซ้ำกันได้ แต่ Traveler ID ต้องไม่ซ้ำ · ใช้ a–z 0–9 _ และ . ยาว 3–30 ตัว</p><label class="form-field">เรื่องราวสั้น ๆ ของตัวละคร<textarea name="bio" maxlength="220">${esc(pr.bio || '')}</textarea></label><p class="form-error" role="alert" hidden></p><div class="form-submit"><button class="primary" type="submit">บันทึกชื่อและโปรไฟล์</button></div></form>`);
+    <form id="profile-form" novalidate><label class="form-field">ชื่อในโลก GERARAI<input name="name" required maxlength="40" value="${esc(pr.display_name || '')}" placeholder="เช่น Amber"></label><label class="form-field">Traveler ID (@username)<input name="handle" maxlength="30" placeholder="เช่น akanid_84" value="${esc(pr.handle || '')}" autocapitalize="off" autocomplete="username" spellcheck="false"></label><p class="form-help">ชื่อเล่นซ้ำกันได้ แต่ Traveler ID ต้องไม่ซ้ำ · ใช้ a–z 0–9 _ และ . ยาว 3–30 ตัว</p><label class="form-field">เรื่องราวสั้น ๆ ของตัวละคร<textarea name="bio" maxlength="220">${esc(pr.bio || '')}</textarea></label><p class="form-error" role="alert" hidden></p><div class="form-submit"><button class="primary" type="submit">บันทึกชื่อและโปรไฟล์</button></div></form>`);
     const form = document.getElementById('profile-form');
     const showError = msg => { const el = form.querySelector('.form-error'); el.textContent = msg; el.hidden = !msg; };
     const status = document.getElementById('avatar-status');
@@ -481,7 +483,9 @@
       e.preventDefault();
       const d = new FormData(form), name = String(d.get('name')).trim(), handle = String(d.get('handle')).trim().toLowerCase(), bio = String(d.get('bio')).trim();
       if (!name) { showError('ใส่ชื่อในโลก GERARAI'); return; }
-      if (handle && !HANDLE_RE.test(handle)) { showError('Traveler ID ใช้ได้เฉพาะ a–z 0–9 _ และ . ยาว 3–30 ตัว ไม่มีเว้นวรรค'); return; }
+      const oldHandle = Remote.profile?.handle || '';
+      if (!handle && oldHandle) { showError('ต้องมี @ID เสมอ ลบไม่ได้ แต่เปลี่ยนเป็นชื่ออื่นได้'); return; }
+      if (handle && handle !== oldHandle && !HANDLE_NEW_RE.test(handle)) { showError('@ID ใช้ได้เฉพาะ a–z 0–9 และ _ ยาว 3–20 ตัว ไม่มีเว้นวรรค'); return; }
       showError('');
       const btn = form.querySelector('[type=submit]'); busy(btn, true, 'กำลังบันทึก…');
       try { await Remote.updateProfile({ display_name: name, bio, handle }); closeDialog(); render(); toast('บันทึกตัวละครแล้ว'); }
@@ -652,6 +656,7 @@
   const baseRender = render;
   render = function () {
     if (Gate.open && !Remote.user) { clearMemberState(); Gate.enter(); return; }
+    setTimeout(maybeAskHandle, 0);
     if (route.startsWith('u/')) {
       if (map) { map.remove(); map = null; }
       renderNav(); renderPublicProfile(route.slice(2)); decorateIcons(main); return;
@@ -770,6 +775,157 @@
       case 'migrate-discard': stop(e); state.posts = state.posts.filter(p => !String(p.id).startsWith('local-')); persist(); closeDialog(); toast('ลบเรื่องราวบนเครื่องนี้แล้ว'); break;
       case 'about': stop(e); openDialog('GERARAI · v0.7.0-dev', `<p style="font-size:.9rem;line-height:1.9">ระบบสมาชิกเปิดใช้แล้ว เรื่องราว ความคิดเห็น การถูกใจ และการบันทึกของสมาชิกเก็บบนเซิร์ฟเวอร์และคนอื่นเห็นได้<br><br>เรื่องราวที่มีป้าย “ตัวอย่าง” รวมถึงสถานที่ รีวิว และพิกัดที่ติดป้ายข้อมูลตัวอย่าง ใช้เพื่อสาธิตเท่านั้น ภาพประกอบตัวอย่างสร้างด้วย AI</p><p class="legal-links"><a href="#privacy">ประกาศความเป็นส่วนตัว</a> · <a href="#terms">ข้อกำหนดการใช้บริการ</a> · <a href="#community">มาตรฐานชุมชน</a> · <a href="#contact">ติดต่อ</a></p>`); break;
     }
+  }, true);
+
+  /* ---------- Social Access v0.1: @ID (handle), @ID lookup, Following feed ---------- */
+  // Server side: supabase/migrations/20261009090000_social_access.sql. Both RPCs are EXECUTE for authenticated only; they are
+  // called with the member's own access token (same token the session uses), never anonymously.
+  const HANDLE_NEW_RE = /^[a-z0-9_]{3,20}$/;
+  async function memberRpc(name, args) {
+    let token = '';
+    try { token = JSON.parse(localStorage.getItem(AUTH_KEY) || 'null')?.access_token || ''; } catch { token = ''; }
+    if (!Remote.user || !token) throw Object.assign(new Error('ต้องเข้าสู่ระบบก่อน'), { code: 'auth' });
+    const cfg = window.GERARAI_CONFIG.supabase;
+    const res = await fetch(cfg.url + '/rest/v1/rpc/' + name, { method: 'POST', cache: 'no-store',
+      headers: { apikey: cfg.anonKey, Authorization: 'Bearer ' + token, 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(args || {}) });
+    const body = await res.json().catch(() => null);
+    if (!res.ok) throw Object.assign(new Error(body?.message || 'HTTP ' + res.status), { code: body?.code || String(res.status), status: res.status });
+    return body;
+  }
+
+  // Following feed: the server lists ids (following_feed); each Story is read through the normal RLS read path (fetchPost).
+  const FF = { ids: [], cache: new Map(), next: null, following: null, loaded: false, loading: false, error: null, seq: 0, at: 0 };
+  function resetFeed() { Object.assign(FF, { ids: [], next: null, following: null, loaded: false, loading: false, error: null, at: 0 }); FF.cache.clear(); FF.seq++; }
+  const feedPost = id => Remote.data.posts.find(p => p.id === id) || FF.cache.get(id);
+  const feedList = () => FF.ids.map(feedPost).filter(p => p && !state.reported.some(r => r.id === p.id));
+  // Feed Stories stay reachable for like / save / comment even when the general post list is refreshed
+  const basePostSource = postSource;
+  postSource = () => { const base = basePostSource(), have = new Set(base.map(p => p.id)); return [...base, ...[...FF.cache.values()].filter(p => !have.has(p.id))]; };
+  function feedMarkup() {
+    if (FF.error) return empty('โหลดฟีดไม่สำเร็จ', esc(Remote.errorText(FF.error)), '<button class="primary" data-action="feed-refresh">ลองอีกครั้ง</button>');
+    if (!FF.loaded) return '<p class="empty-state" role="status">กำลังโหลดเรื่องราวจากคนที่คุณติดตาม…</p>';
+    const posts = feedList(), find = '<button class="primary" data-action="handle-search">ค้นหาเพื่อนด้วย @ID</button>';
+    if (!FF.following) return empty('ยังไม่ได้ติดตามใคร', 'ฟีดนี้แสดงเฉพาะเรื่องราวจากคนที่คุณติดตาม ค้นหาเพื่อนด้วย @ID แล้วกดติดตาม', find);
+    if (!posts.length) return empty('ยังไม่มีเรื่องราวใหม่', 'คนที่คุณติดตามยังไม่ได้แชร์เรื่องราว ลองค้นหาเพื่อนเพิ่มด้วย @ID', find);
+    return posts.map(postMarkup).join('') + (FF.next ? `<div class="feed-more"><button class="secondary" data-action="feed-more" ${FF.loading ? 'disabled' : ''}>โหลดเพิ่ม</button></div>` : '');
+  }
+  function drawFeed() {
+    const box = route === 'feed' && Gate.open ? main.querySelector('#feed-posts') : null;
+    if (!box) return;
+    box.innerHTML = feedMarkup(); decorateIcons(box);
+  }
+  async function loadFeed(more = false) {
+    if (!Remote.user || (FF.loading && more)) return;
+    const seq = ++FF.seq, epoch = Remote.epoch;
+    FF.loading = true; FF.error = null;
+    try {
+      const args = { p_limit: 20 };
+      if (more && FF.next) { args.p_before = FF.next.created_at; args.p_before_id = FF.next.id; }
+      const r = await memberRpc('following_feed', args);
+      const ids = (r?.rows || []).map(x => x.id).filter(Remote.isId);
+      const got = await Promise.all(ids.map(id => Remote.data.posts.find(p => p.id === id) || Remote.fetchPost(id).catch(() => null)));
+      if (seq !== FF.seq || epoch !== Remote.epoch) return;
+      got.forEach(p => { if (p) FF.cache.set(p.id, p); });
+      FF.ids = more ? [...FF.ids, ...ids.filter(id => !FF.ids.includes(id))] : ids;
+      FF.next = r?.next || null; FF.following = Number(r?.following || 0); FF.loaded = true; FF.at = Date.now();
+    } catch (err) { if (seq !== FF.seq) return; FF.error = err; FF.loaded = true; console.warn('[GERARAI] following_feed', err?.code, err?.message); }
+    finally { if (seq === FF.seq) FF.loading = false; }
+    drawFeed();
+  }
+  feedPosts = () => feedList();                                 // member Feed = Following only (no sample or global Stories)
+  const baseRenderFeed = renderFeed;
+  renderFeed = function () {
+    baseRenderFeed();
+    main.querySelector('.feed-tabs')?.replaceWith(Object.assign(document.createElement('div'), { className: 'feed-tabs following-only',
+      innerHTML: '<span class="tab active" aria-current="page">กำลังติดตาม</span><button class="text-button" data-action="feed-refresh">รีเฟรช</button><button class="text-button" data-action="handle-search">ค้นหา @ID</button>' }));
+    main.querySelector('.search-result-note')?.remove();
+    drawFeed();
+    if (!FF.loading && (!FF.loaded || Date.now() - FF.at > 60000)) loadFeed();
+  };
+  // follow / unfollow / block: the next Feed load asks the server again; an unfollowed or blocked author disappears at once
+  const baseFollow = Remote.follow;
+  Remote.follow = async function (userId, on) {
+    const r = await baseFollow.call(this, userId, on);
+    if (!on) FF.ids = FF.ids.filter(id => feedPost(id)?.authorId !== userId);
+    FF.loaded = FF.loaded && !on; FF.at = 0; FF.seq++; FF.loading = false;
+    if (route === 'feed') setTimeout(drawFeed, 0);
+    return r;
+  };
+  const baseBlock = Remote.block;
+  Remote.block = async function (userId, ...rest) {
+    const r = await baseBlock.call(this, userId, ...rest);
+    FF.ids = FF.ids.filter(id => feedPost(id)?.authorId !== userId); FF.at = 0;
+    return r;
+  };
+
+  // @ID lookup (header search starting with "@", the mobile search, or the Feed button)
+  const socialRenderNav = renderNav;
+  renderNav = function () { socialRenderNav(); const si = document.getElementById('search-input'); if (si && Gate.open) si.placeholder = 'ค้นหาสถานที่ เรื่องราว หรือ @ID…'; };
+  const baseSearch = search;
+  search = function (q) {
+    const t = String(q || '').trim();
+    if (t.startsWith('@')) { if (Remote.user) handleSearchDialog(t); else signInDialog(); return; }
+    return baseSearch(q);
+  };
+  let handleSearchSeq = 0;
+  function handleSearchDialog(initial = '@') {
+    openDialog('ค้นหาสมาชิกด้วย @ID', `<form id="handle-search-form" class="comment-form" role="search"><input name="q" value="${esc(initial)}" maxlength="31" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="@ID ที่ต้องการค้นหา" placeholder="@traveler_id"><button class="primary" type="submit">ค้นหา</button></form>
+      <p class="form-help">พิมพ์ @ID อย่างน้อย 2 ตัวอักษร ระบบแสดงเฉพาะชื่อ @ID และรูปโปรไฟล์ที่เป็นข้อมูลสาธารณะ</p><div id="handle-results" class="handle-results" aria-live="polite"></div>`);
+    const form = document.getElementById('handle-search-form'), input = form.q;
+    let t = null;
+    const run = async () => {
+      const box = document.getElementById('handle-results'); if (!box) return;
+      const q = input.value.trim().toLowerCase().replace(/^@/, '');
+      if (!/^[a-z0-9_.]{2,30}$/.test(q)) { box.innerHTML = q.length >= 2 ? '<p class="form-help">@ID ใช้ได้เฉพาะ a–z 0–9 และ _</p>' : ''; return; }
+      const seq = ++handleSearchSeq; box.innerHTML = '<p class="form-help" role="status">กำลังค้นหา…</p>';
+      try {
+        const rows = await memberRpc('search_profiles_by_handle', { p_query: q, p_limit: 8 });
+        if (seq !== handleSearchSeq || !document.body.contains(box)) return;
+        box.innerHTML = (rows || []).length ? rows.map(r => `<button class="side-link handle-result" data-open-profile="${esc(r.id)}"><span class="avatar" aria-hidden="true">${Avatar.inner({ name: r.display_name || r.handle, photoUrl: Remote.avatarUrl(r.avatar_path), avatarType: r.avatar_type || (r.avatar_path ? 'photo' : 'initial'), pixelSpec: r.pixel_avatar_data || null })}</span><span><b>${esc(r.display_name || '')}</b><small>@${esc(r.handle)}</small></span></button>`).join('')
+          : `<p class="form-help">ไม่พบ @${esc(q)}</p>`;
+      } catch (err) { if (seq === handleSearchSeq && document.body.contains(box)) box.innerHTML = `<p class="form-error">${esc(Remote.errorText(err))}</p>`; }
+    };
+    input.addEventListener('input', () => { input.value = input.value.toLowerCase(); clearTimeout(t); t = setTimeout(run, 250); });
+    form.addEventListener('submit', e => { e.preventDefault(); clearTimeout(t); run(); });
+    input.focus(); input.setSelectionRange(input.value.length, input.value.length);
+    if (initial.replace(/^@/, '').length >= 2) run();
+  }
+
+  // Every member chooses one @ID: existing accounts after sign-in, new accounts as the last onboarding step (the server only
+  // accepts profile changes once onboarding is complete, so the question waits for it).
+  const needsHandle = () => !!(Gate.open && Remote.user && Remote.profile && !Remote.profile.handle);
+  const onboardingDone = () => { try { return (window.GerarAIOnboardingUI?.assess?.().mode || 'none') === 'none'; } catch { return true; } };
+  function maybeAskHandle() {
+    if (!needsHandle() || dialog.open || document.getElementById('onboarding-dialog')?.open || !onboardingDone()) return;
+    handleDialog();
+  }
+  function handleDialog() {
+    openDialog('เลือก @ID ของคุณ', `<form id="handle-form" novalidate><p class="form-help">@ID คือชื่อที่เพื่อนใช้ค้นหาและติดตามคุณ ใช้ a–z 0–9 และ _ ยาว 3–20 ตัว (ไม่สนตัวพิมพ์เล็กใหญ่) เปลี่ยนภายหลังได้ แต่ต้องมีเสมอ</p>
+      <label class="form-field">@ID<input name="handle" required minlength="3" maxlength="20" autocapitalize="off" autocomplete="username" spellcheck="false" placeholder="เช่น mint_trip"></label>
+      <p class="form-error" role="alert" hidden></p>
+      <div class="form-submit"><button class="text-button" type="button" data-action="signout">ออกจากระบบ</button><button class="primary" type="submit">บันทึก @ID</button></div></form>`);
+    const form = document.getElementById('handle-form'), input = form.handle;
+    const showError = m => { const el = form.querySelector('.form-error'); el.textContent = m; el.hidden = !m; };
+    input.addEventListener('input', () => { input.value = input.value.toLowerCase().replace(/^@/, ''); });
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+      const handle = input.value.trim().toLowerCase().replace(/^@/, '');
+      if (!HANDLE_NEW_RE.test(handle)) { showError('@ID ใช้ได้เฉพาะ a–z 0–9 และ _ ยาว 3–20 ตัว'); return; }
+      const pr = Remote.profile, btn = form.querySelector('[type=submit]'); showError(''); busy(btn, true, 'กำลังบันทึก…');
+      try { await Remote.updateProfile({ display_name: pr.display_name, bio: pr.bio, handle }); closeDialog(); render(); toast(`ตั้ง @${handle} แล้ว`); }
+      catch (err) { busy(btn, false); showError(err?.code === '23505' ? 'มีคนใช้ @ID นี้แล้ว ลองชื่ออื่น' : /handle_format/.test(err?.message || '') ? '@ID ใช้ได้เฉพาะ a–z 0–9 และ _ ยาว 3–20 ตัว' : Remote.errorText(err)); }
+    });
+    input.focus();
+  }
+  setInterval(maybeAskHandle, 2000);
+
+  document.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.openProfile) { stop(e); if (dialog.open) closeDialog(); navigate('u/' + b.dataset.openProfile); return; }
+    const a = b.dataset.action;
+    if (a === 'handle-search') { stop(e); if (Remote.user) handleSearchDialog('@'); else signInDialog(); }
+    else if (a === 'feed-refresh') { stop(e); FF.loaded = false; FF.error = null; drawFeed(); loadFeed(); }
+    else if (a === 'feed-more') { stop(e); b.disabled = true; loadFeed(true); }
   }, true);
 
   /* ---------- start ---------- */

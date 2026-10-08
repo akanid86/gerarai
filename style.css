@@ -219,3 +219,11 @@ html:not(.gerarai-app) body>.topbar,html:not(.gerarai-app) body>.app-layout,html
 .gate-foot{padding:18px 16px 28px;text-align:center;color:var(--muted)}
 .gate-links{display:flex;flex-wrap:wrap;justify-content:center;gap:8px 18px;margin-bottom:10px;font-size:.88rem}
 @media (max-width:600px){.gate-top .brand-wordmark small{display:none}.gate-card{padding:28px 18px}.gate-card h1{font-size:1.9rem}}
+/* Social Access v0.1: Following-only Feed header, @ID lookup results */
+.feed-tabs.following-only{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.feed-tabs.following-only .tab{cursor:default}
+.feed-more{display:flex;justify-content:center;padding:12px 0 4px}
+.handle-results{display:grid;gap:6px;margin-top:10px}
+.handle-result{display:flex;align-items:center;gap:10px;width:100%;text-align:left}
+.handle-result .avatar{width:38px;height:38px;flex-shrink:0}
+.handle-result small{display:block;color:var(--muted)}
