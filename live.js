@@ -1049,6 +1049,57 @@
     return audEmergency.call(this, { ...args, report: { ...(args?.report || {}), audience: s?.value || 'followers' } });
   };
   window.addEventListener('gerarai:identity-changing', () => { AUD.byKey.clear(); AUD.key = 'new'; });
+  /* ---------- Check-in AREA / VENUE search (GERARAI-owned catalogue only; never Google Places) ---------- */
+  // Used by the Story composer's check-in step (checkin-composer.js). Explore keeps Remote.searchAreas (empty term = list).
+  // Reads the same RLS-protected rows as before (published AREAs; published, non-sample GERARAI places) and only the
+  // columns the composer shows. The term is matched literally (LIKE wildcards escaped), case-insensitively (ILIKE; Thai has no
+  // case), against the AREA display / canonical name (aliases are ranked when present) and the VENUE name; results are ranked
+  // exact → prefix → word prefix → partial, then by length and Thai collation. Below CHECKIN_SEARCH_MIN characters no request is made.
+  const CHECKIN_SEARCH_MIN = 2, CHECKIN_SEARCH_LIMIT = 12, CHECKIN_SEARCH_FETCH = 40;
+  const ckNorm = t => String(t || '').normalize('NFC').toLocaleLowerCase('th').replace(/\s+/g, ' ').trim();
+  const ckTerm = t => String(t || '').normalize('NFC').replace(/\s+/g, ' ').trim().slice(0, 100);
+  const ckPattern = t => '%' + t.replace(/[\\%_]/g, c => '\\' + c).replace(/\*/g, '') + '%';
+  function ckRank(q, names) {
+    let best = 9;
+    for (const raw of names) {
+      const n = ckNorm(raw); if (!n) continue;
+      const r = n === q ? 0 : n.startsWith(q) ? 1 : n.split(/[\s\-–·,/()]+/).some(w => w.startsWith(q)) ? 2 : n.includes(q) ? 3 : 9;
+      if (r < best) best = r;
+    }
+    return best;
+  }
+  const ckSort = (q, rows, names, label) => rows.map(r => ({ r, k: ckRank(q, names(r)) })).filter(x => x.k < 9)
+    .sort((a, b) => a.k - b.k || label(a.r).length - label(b.r).length || label(a.r).localeCompare(label(b.r), 'th'))
+    .slice(0, CHECKIN_SEARCH_LIMIT).map(x => x.r);
+  // One PostgREST read per matched column (no hand-built or() filter, so any query text is safe), member token only, merged by id.
+  async function ckSelect(table, columns, matches, eqs) {
+    let token = '';
+    try { token = JSON.parse(localStorage.getItem(AUTH_KEY) || 'null')?.access_token || ''; } catch { token = ''; }
+    if (!Remote.user || !token) throw Object.assign(new Error('ต้องเข้าสู่ระบบก่อน'), { code: 'auth' });
+    const cfg = window.GERARAI_CONFIG.supabase, out = new Map();
+    const lists = await Promise.all(matches.map(async ([col, t]) => {
+      const qs = new URLSearchParams({ select: columns, [col]: 'ilike.' + ckPattern(t), order: col + '.asc', limit: String(CHECKIN_SEARCH_FETCH) });
+      for (const [k, v] of Object.entries(eqs)) qs.append(k, 'eq.' + v);
+      const res = await fetch(cfg.url + '/rest/v1/' + table + '?' + qs.toString(), { cache: 'no-store',
+        headers: { apikey: cfg.anonKey, Authorization: 'Bearer ' + token, Accept: 'application/json' } });
+      const body = await res.json().catch(() => null);
+      if (!res.ok || !Array.isArray(body)) throw Object.assign(new Error(body?.message || 'HTTP ' + res.status), { code: body?.code || String(res.status), status: res.status });
+      return body;
+    }));
+    for (const list of lists) for (const r of list) if (r?.id && !out.has(r.id)) out.set(r.id, r);
+    return [...out.values()];
+  }
+  Remote.checkinSearchMin = CHECKIN_SEARCH_MIN;
+  Remote.searchCheckinAreas = async function (term = '') {
+    const t = ckTerm(term), q = ckNorm(t); if ([...q].length < CHECKIN_SEARCH_MIN) return [];
+    const rows = await ckSelect('areas', 'id,display_name,canonical_name,aliases', [['display_name', t], ['canonical_name', t]], { status: 'published' });
+    return ckSort(q, rows, a => [a.display_name, a.canonical_name, ...(a.aliases || [])], a => a.display_name || '');
+  };
+  Remote.searchCheckinVenues = async function (term = '') {
+    const t = ckTerm(term), q = ckNorm(t); if ([...q].length < CHECKIN_SEARCH_MIN) return [];
+    const rows = await ckSelect('places', 'id,name,city,source', [['name', t]], { status: 'published', is_sample: 'false' });
+    return ckSort(q, rows, v => [v.name], v => v.name || '');
+  };
   /* ---------- start ---------- */
   Remote.onChange = (event, err) => {
     if (event === 'error') { fail(err); if (!Remote.user) { if (Gate.open) Gate.enter(); } else if (!Gate.open) Gate.setStatus('error'); return; }

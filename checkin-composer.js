@@ -60,15 +60,21 @@
  function choices(d){
   const g=shell(d,'Check-in',`<div class="s4-choices"><label class="form-field">ค้นหาพื้นที่หรือสถานที่<input name="checkin-search" maxlength="100" placeholder="ชื่อเมืองหรือสถานที่"></label><div data-s4-results aria-live="polite"></div><button class="secondary" data-s4="gps">ใช้ตำแหน่งปัจจุบัน</button><button class="secondary" data-s4="map">เลือกจุดบนแผนที่</button></div>${errbox}<button class="text-button" data-s4="back">กลับไปเรื่องราว</button>`);
   back(d);dialogContent.querySelector('[data-s4=gps]').onclick=()=>gps(d);dialogContent.querySelector('[data-s4=map]').onclick=()=>pointStep(d,'map_pin');
-  let seq=0,timer;const input=dialogContent.querySelector('[name=checkin-search]');
-  async function search(){const q=input.value,run=++seq;const host=dialogContent.querySelector('[data-s4-results]');host.textContent='กำลังค้นหา…';
-   try{const [areas,venues]=await Promise.all([R.searchAreas(q),R.searchCheckinVenues(q)]);if(!valid(d,g)||run!==seq)return;
-    host.innerHTML=`<h3>พื้นที่ · AREA</h3>${areas.map((a,i)=>`<button class="secondary" data-area-choice="${i}">${esc(a.display_name)}</button>`).join('')||'<p>ไม่พบพื้นที่</p>'}<h3>สถานที่ใน GERARAI · VENUE</h3>${venues.map((v,i)=>`<button class="secondary" data-venue-choice="${i}">${esc(v.name)} · ${esc(v.city||'')}</button>`).join('')||'<p>ไม่พบสถานที่</p>'}`;
-    host.querySelectorAll('[data-area-choice]').forEach(b=>b.onclick=()=>reference(d,'area',areas[+b.dataset.areaChoice]));
-    host.querySelectorAll('[data-venue-choice]').forEach(b=>b.onclick=()=>reference(d,'venue',venues[+b.dataset.venueChoice]));
-   }catch(e){if(valid(d,g)&&run===seq){host.textContent='';error(R.errorText(e));}}
-  }
-  input.oninput=()=>{seq++;clearTimeout(timer);timer=setTimeout(search,200);};search();
+  // Search states: idle (query too short, no request) → กำลังค้นหา... → results / ไม่พบพื้นที่ / ไม่พบสถานที่ / request error, per
+  // section. "ไม่พบ…" is shown only after that section's request has completed successfully; stale answers are ignored.
+  let seq=0,timer;const input=dialogContent.querySelector('[name=checkin-search]'),host=dialogContent.querySelector('[data-s4-results]');
+  const MIN=R.checkinSearchMin||2,term=()=>input.value.normalize('NFC').replace(/\s+/g,' ').trim();
+  const LABEL={area:['พื้นที่ · AREA','ไม่พบพื้นที่','ค้นหาพื้นที่ไม่สำเร็จ ลองอีกครั้ง'],venue:['สถานที่ใน GERARAI · VENUE','ไม่พบสถานที่','ค้นหาสถานที่ไม่สำเร็จ ลองอีกครั้ง']};
+  function pending(){const q=term();host.dataset.s4State=[...q].length<MIN?'idle':'loading';
+   host.innerHTML=[...q].length<MIN?`<p class="s4-search-hint">พิมพ์ชื่อพื้นที่หรือสถานที่อย่างน้อย ${MIN} ตัวอักษร</p>`:Object.entries(LABEL).map(([k,[h]])=>`<h3>${h}</h3><div data-s4-section="${k}" data-s4-state="loading"><p role="status">กำลังค้นหา...</p></div>`).join('');}
+  function fill(kind,run,promise){promise.then(rows=>{if(!valid(d,g)||run!==seq)return;const box=host.querySelector(`[data-s4-section=${kind}]`);if(!box)return;
+    box.dataset.s4State=rows.length?'results':'empty';
+    box.innerHTML=rows.map((x,i)=>kind==='area'?`<button class="secondary" data-area-choice="${i}">${esc(x.display_name)}</button>`:`<button class="secondary" data-venue-choice="${i}">${esc(x.name)} · ${esc(x.city||'')}</button>`).join('')||`<p>${LABEL[kind][1]}</p>`;
+    box.querySelectorAll(kind==='area'?'[data-area-choice]':'[data-venue-choice]').forEach(b=>b.onclick=()=>reference(d,kind,rows[+b.dataset[kind==='area'?'areaChoice':'venueChoice']]));
+   },e=>{if(!valid(d,g)||run!==seq)return;const box=host.querySelector(`[data-s4-section=${kind}]`);if(!box)return;box.dataset.s4State='error';box.innerHTML=`<p class="form-error" role="alert">${LABEL[kind][2]}</p>`;console.warn('[GERARAI] check-in search',kind,e?.code,e?.message);});}
+  function search(){if(!valid(d,g)||!host.isConnected)return;const q=term(),run=++seq;pending();if([...q].length<MIN)return;   // view left: no request
+   fill('area',run,Promise.resolve().then(()=>(R.searchCheckinAreas||R.searchAreas)(q)));fill('venue',run,Promise.resolve().then(()=>R.searchCheckinVenues(q)));}
+  input.oninput=()=>{seq++;clearTimeout(timer);pending();if([...term()].length>=MIN)timer=setTimeout(search,250);};pending();
  }
  function reference(d,kind,item){
   const label=kind==='area'?item.display_name:item.name;
