@@ -57,7 +57,26 @@
   }
   R.relTime = relTime;
 
-  function publicUrl(path) { return sb.storage.from(BUCKET).getPublicUrl(path).data.publicUrl; }
+  // Story photos (Post Audience v0.1): post-media is a PRIVATE bucket. There is no permanent public URL; Storage mints a
+  // short-lived signed URL only when storage.objects RLS lets this viewer read the object (own upload, or a Story the
+  // viewer may read: audience + blocks + sign-in). Expired or refused URLs are re-requested once on image error.
+  const MEDIA_TTL = 300, signed = new Map();            // path → { url, exp }
+  function mediaUrl(path) { const s = path && signed.get(path); return s && s.exp > Date.now() + 30000 ? s.url : ''; }
+  async function signMedia(paths) {
+    const need = [...new Set(paths.filter(p => p && !mediaUrl(p)))]; if (!need.length || !sb) return;
+    const epoch = R.epoch || 0, at = Date.now();
+    const { data, error } = await sb.storage.from(BUCKET).createSignedUrls(need, MEDIA_TTL);
+    if (error || epoch !== (R.epoch || 0)) return;   // no URL is better than a wrong one; the Story text still shows
+    (data || []).forEach(r => { if (r && !r.error && r.path && r.signedUrl) signed.set(r.path, { url: r.signedUrl, exp: at + MEDIA_TTL * 1000 }); });
+  }
+  async function signPosts(posts) { await signMedia(posts.map(p => p.imagePath)); posts.forEach(p => { if (p.imagePath) p.image = mediaUrl(p.imagePath); }); }
+  window.addEventListener('gerarai:identity-changing', () => signed.clear());
+  document.addEventListener('error', ev => {
+    const img = ev.target; if (!(img instanceof HTMLImageElement) || img.dataset.mediaRetry) return;
+    const m = /\/storage\/v1\/object\/sign\/post-media\/([^?#]+)/.exec(img.getAttribute('src') || ''); if (!m) return;
+    const path = decodeURIComponent(m[1]); img.dataset.mediaRetry = '1'; signed.delete(path);
+    signMedia([path]).then(() => { const u = mediaUrl(path); if (u) { img.src = u; (R.data.posts || []).forEach(p => { if (p.imagePath === path) p.image = u; }); } }).catch(() => {});
+  }, true);
   function avatarUrl(path) { return path ? sb.storage.from(AVATAR_BUCKET).getPublicUrl(path).data.publicUrl : ''; }
   R.avatarUrl = avatarUrl;
 
@@ -74,7 +93,7 @@
       time: relTime(r.created_at), createdAt: r.created_at,
       edited: new Date(r.updated_at) - new Date(r.created_at) > 2000,
       place: '', placeName: '', placeDisclosure: 'private', ownPlace: null,
-      image: media ? publicUrl(media.path) : '',
+      imagePath: media?.path || '', image: media ? mediaUrl(media.path) : '',
       title: r.title, body: r.body, tags: r.tags || [],
       likes: (r.likes?.[0]?.count || 0) - (liked ? 1 : 0),   // app.js บวกของผู้ใช้เองตอนแสดงผล
       comments: r.comments?.[0]?.count || 0,
@@ -209,7 +228,8 @@
   R.refreshPosts = async function () {
     const rows = check(await sb.from('posts').select(POST_SELECT).eq('status', 'published')
       .order('created_at', { ascending: false }).limit(60));
-    R.data.posts = rows.map(mapPost);
+    const posts = rows.map(mapPost); await signPosts(posts);
+    R.data.posts = posts;
     await R.attachDiscoveries(R.data.posts);
   };
 
@@ -251,7 +271,7 @@
     const ids = check(await sb.rpc('place_stories', { p_place_id: placeId, p_limit: 50 })).map(r => r.post_id);
     if (!ids.length) return [];
     const rows = check(await sb.from('posts').select(POST_SELECT).in('id', ids));
-    const posts = rows.map(mapPost);
+    const posts = rows.map(mapPost); await signPosts(posts);
     await R.attachDiscoveries(posts);
     posts.forEach(p => { const i = R.data.posts.findIndex(x => x.id === p.id); if (i < 0) R.data.posts.push(p); else R.data.posts[i] = p; });
     return posts;
@@ -285,7 +305,7 @@
     const ids=result.rows.map(x=>x.id);
     const rows=ids.length?check(await sb.from('posts').select(POST_SELECT).in('id',ids).eq('status','published')):[];
     const by=new Map(rows.map(r=>[r.id,mapPost(r)])),posts=ids.map(id=>by.get(id)).filter(Boolean);
-    await R.attachDiscoveries(posts);
+    await signPosts(posts);await R.attachDiscoveries(posts);
     if(epoch!==(R.epoch||0))throw new DOMException('Identity changed','AbortError');
     posts.forEach(p=>{const i=R.data.posts.findIndex(x=>x.id===p.id);if(i<0)R.data.posts.push(p);else R.data.posts[i]=p;});
     return {posts,total:result.total,next:result.next};
@@ -294,7 +314,7 @@
     const epoch = R.epoch || 0;
     const row = check(await sb.from('posts').select(POST_SELECT).eq('id', id).eq('status','published').maybeSingle());
     if (!row) return null;
-    const post = mapPost(row);
+    const post = mapPost(row); await signPosts([post]);
     await R.attachDiscoveries([post]);
     if (epoch !== (R.epoch || 0)) return null;
     const i=R.data.posts.findIndex(p=>p.id===id);
@@ -311,7 +331,7 @@
     if(!rows.length)return {rows:[],next:null};
     const posts=check(await sb.from('posts').select(POST_SELECT).in('id',rows.map(d=>d.post_id)).eq('status','published').abortSignal(signal));
     if(epoch!==(R.epoch || 0))throw new DOMException('Identity changed','AbortError');
-    const mapped=posts.map(mapPost);await R.attachDiscoveries(mapped);
+    const mapped=posts.map(mapPost);await signPosts(mapped);await R.attachDiscoveries(mapped);
     if(epoch!==(R.epoch||0))throw new DOMException('Identity changed','AbortError');
     const byId=new Map(mapped.map(p=>[p.id,p]));
     return {rows:rows.filter(d=>byId.get(d.post_id)?.discovery?.id===d.id).map(d=>({...byId.get(d.post_id).discovery,post:byId.get(d.post_id)})),next:rows.length===200?rows[rows.length-1].id:null};
@@ -445,7 +465,7 @@
   R.userPosts = async function (userId) {
     const rows = check(await sb.from('posts').select(POST_SELECT).eq('author_id', userId).eq('status', 'published')
       .order('created_at', { ascending: false }).limit(60));
-    const posts = rows.map(mapPost);
+    const posts = rows.map(mapPost); await signPosts(posts);
     await R.attachDiscoveries(posts);
     return posts;
   };
@@ -512,7 +532,7 @@
     if(ticket.owner && ticket.owner!==me)throw new Error('identity_changed');ticket.owner=me;
     if(ticket.ready)return ticket.id;
     const blob=await dataUrlToBlob(image.dataUrl);
-    const upload=await sb.storage.from(BUCKET).upload(ticket.path,blob,{contentType:'image/jpeg',upsert:false});
+    const upload=await sb.storage.from(BUCKET).upload(ticket.path,blob,{contentType:'image/jpeg',cacheControl:String(MEDIA_TTL),upsert:false});
     if(upload.error && !/already exists|duplicate/i.test(upload.error.message||''))throw upload.error;
     const record=await sb.from('media').insert({id:ticket.id,owner_id:me,bucket:BUCKET,path:ticket.path,mime:'image/jpeg',width:image.width,height:image.height,bytes:blob.size});
     if(record.error && !isDuplicate(record.error))throw record.error;
@@ -525,7 +545,8 @@
     const state=check(await sb.rpc('story_checkin_for_edit',{p_post_id:id}));
     const row=check(await sb.from('posts').select('id,title,body,tags,post_media(media_id,position,media(path,width,height))').eq('id',id).single());
     if(epoch!==(R.epoch||0))throw new Error('identity_changed');
-    return {...state,content:row,media:(row.post_media||[]).sort((a,b)=>a.position-b.position).map(m=>({id:m.media_id,url:publicUrl(m.media.path)}))};
+    const media=(row.post_media||[]).sort((a,b)=>a.position-b.position);await signMedia(media.map(m=>m.media.path));
+    return {...state,content:row,media:media.map(m=>({id:m.media_id,url:mediaUrl(m.media.path)}))};
   };
   R.mutateStoryCheckin = async function(request) {
     needUser();const epoch=R.epoch||0;
@@ -622,11 +643,11 @@
       if (image) {
         path = `${me}/${crypto.randomUUID()}.jpg`;
         const blob = await dataUrlToBlob(image.dataUrl);
-        check(await sb.storage.from(BUCKET).upload(path, blob, { contentType: 'image/jpeg', cacheControl: '31536000', upsert: false }));
+        check(await sb.storage.from(BUCKET).upload(path, blob, { contentType: 'image/jpeg', cacheControl: String(MEDIA_TTL), upsert: false }));
         mediaId = check(await sb.from('media').insert({ owner_id: me, bucket: BUCKET, path, mime: 'image/jpeg', width: image.width, height: image.height, bytes: blob.size }).select('id').single()).id;
       }
       const clean = {};   // whitelist: nothing about source/official is ever sent
-      ['type_code', 'latitude', 'longitude', 'location_precision', 'reported_at', 'water_depth', 'vehicle_access', 'need_code', 'people_count', 'severity', 'note']
+      ['type_code', 'latitude', 'longitude', 'location_precision', 'reported_at', 'water_depth', 'vehicle_access', 'need_code', 'people_count', 'severity', 'note', 'audience']
         .forEach(k => { if (report[k] !== undefined && report[k] !== null && report[k] !== '') clean[k] = report[k]; });
       const postId = check(await sb.rpc('create_emergency_report', { p_title: title, p_body: body, p_media_id: mediaId, p_report: clean }));
       return await R.fetchPost(postId);
@@ -659,8 +680,9 @@
     if (!rows.length) return { rows: [], next: null };
     const posts = check(await sb.from('posts').select(POST_SELECT).in('id', rows.map(r => r.post_id)).eq('status', 'published'));
     if (epoch !== (R.epoch || 0)) throw new DOMException('Identity changed', 'AbortError');
-    const byId = new Map(posts.map(p => [p.id, mapPost(p)]));
-    return { rows: rows.filter(r => byId.has(r.post_id)).map(r => ({ ...r, post: byId.get(r.post_id) })), next: rows.length === 200 ? rows[rows.length - 1].id : null };
+    const byId = new Map(posts.map(p => [p.id, mapPost(p)])); await signPosts([...byId.values()]);
+    // The report object is visible to signed-in members; its Story (text, photo) only within the Story's audience.
+    return { rows: rows.map(r => ({ ...r, post: byId.get(r.post_id) })), next: rows.length === 200 ? rows[rows.length - 1].id : null };
   };
   // Feed/Profile cards: attach the emergency row to Stories tagged "emergency" (ignored on older databases).
   R.attachEmergencies = async function (posts) {

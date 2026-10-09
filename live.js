@@ -933,6 +933,92 @@
     else if (a === 'feed-more') { stop(e); b.disabled = true; loadFeed(true); }
   }, true);
 
+  /* ---------- Post Audience v0.1: who may read each Story (enforced by the server; this is only the chooser) ---------- */
+  // Sent with the Story write (content.audience → mutate_story_checkin) or the emergency write (report.audience →
+  // create_emergency_report), so a new Story is never readable by a wider audience than chosen, not even for a moment.
+  // Defaults: every Story → followers, with or without a check-in / place (location never implies public). Only an
+  // explicit Discovery publication (GerarAIAudience.composeDiscovery) starts at public. Editing never changes the stored
+  // audience unless the member does. Emergency reports: the report object is visible to signed-in members; the Story
+  // text / photo follows the audience chosen here (default followers).
+  const AUD_OPTS = [['public', '🌐', 'สาธารณะ', 'สมาชิก GERARAI ทุกคนที่เข้าสู่ระบบ'], ['followers', '👥', 'ผู้ติดตาม', 'เฉพาะคนที่ติดตามคุณ'],
+    ['mutuals', '🤝', 'เพื่อน', 'เฉพาะคนที่คุณกับเขาติดตามกันและกัน'], ['private', '🔒', 'เฉพาะฉัน', 'เห็นได้คนเดียว']];
+  const AUD = { key: 'new', byKey: new Map(), forms: new WeakSet() };
+  const audState = (key = AUD.key) => { let s = AUD.byKey.get(key); if (!s) { s = { value: key === 'new' || key === 'emergency' ? 'followers' : null, touched: false, edit: key !== 'new' && key !== 'emergency', discovery: false }; AUD.byKey.set(key, s); } return s; };
+  const audOpt = v => AUD_OPTS.find(o => o[0] === v);
+  if (!document.getElementById('s4-audience-style')) document.head.insertAdjacentHTML('beforeend', `<style id="s4-audience-style">
+.s4-audience{position:relative;display:flex;align-items:center;justify-content:space-between;gap:8px;margin:8px 0 2px;font-size:.88rem}
+.s4-aud-label{color:var(--muted)}
+.s4-aud-btn{border:1px solid var(--border);background:#fff;color:var(--navy);border-radius:999px;padding:5px 12px;font:inherit;cursor:pointer;min-height:34px}
+.s4-aud-btn:disabled{opacity:.6;cursor:default}
+.s4-aud-sheet{position:absolute;right:0;bottom:calc(100% + 6px);z-index:5;width:min(300px,calc(100vw - 48px));background:#fff;border:1px solid var(--border);border-radius:14px;box-shadow:0 8px 24px rgba(16,27,48,.16);padding:6px;display:grid;gap:2px}
+.s4-aud-sheet button{display:grid;grid-template-columns:24px 1fr;column-gap:8px;text-align:left;border:0;background:none;border-radius:10px;padding:8px;font:inherit;color:var(--navy);cursor:pointer}
+.s4-aud-sheet button span{grid-row:span 2;font-size:1.1rem}
+.s4-aud-sheet button small{color:var(--muted);font-size:.78rem}
+.s4-aud-sheet button[aria-checked=true]{background:var(--soft)}
+.s4-aud-sheet button:focus-visible,.s4-aud-btn:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.s4-aud-note{flex-basis:100%;margin:2px 0 0;color:var(--muted);font-size:.78rem}
+.s4-audience{flex-wrap:wrap}
+</style>`);
+  const audForm = () => dialogContent.querySelector('form[data-s4-form], form#emergency-form');
+  const audKey = form => form.id === 'emergency-form' ? 'emergency' : AUD.key;
+  function audMarkup(s, locked, open, emergency) {
+    const o = audOpt(s.value);
+    return `<div class="s4-audience"><span class="s4-aud-label" id="s4-aud-label">กลุ่มเป้าหมาย</span>
+      <button type="button" class="s4-aud-btn" data-aud-toggle aria-haspopup="true" aria-expanded="${open}" aria-labelledby="s4-aud-label s4-aud-value" ${locked || !o ? 'disabled' : ''}><span id="s4-aud-value">${o ? `${o[1]} ${o[2]}` : 'กำลังโหลด…'}</span> ▾</button>
+      ${open ? `<div class="s4-aud-sheet" role="radiogroup" aria-label="เลือกกลุ่มเป้าหมาย">${AUD_OPTS.map(([v, ic, t, h]) => `<button type="button" role="radio" aria-checked="${v === s.value}" data-aud="${v}"><span>${ic}</span><b>${t}</b><small>${h}</small></button>`).join('')}</div>` : ''}
+      ${emergency ? '<p class="s4-aud-note">ประเภท ตำแหน่ง และสถานะของรายงาน สมาชิกทุกคนเห็นได้ · ข้อความและรูปเห็นตามกลุ่มเป้าหมาย</p>' : ''}</div>`;
+  }
+  function injectAudience(open = false) {
+    const form = audForm(); if (!form) return;
+    const key = audKey(form), emergency = key === 'emergency';
+    if (emergency && !AUD.forms.has(form)) { AUD.forms.add(form); AUD.byKey.delete('emergency'); }   // every report form starts at followers
+    const s = audState(key);
+    const locked = !!form.querySelector('fieldset.s4-fields')?.disabled || !!s.sent;   // an unconfirmed request is resent unchanged
+    form.querySelector('.s4-audience')?.remove();
+    form.querySelector('.form-submit')?.insertAdjacentHTML('beforebegin', audMarkup(s, locked, open, emergency));
+  }
+  new MutationObserver(() => { const form = audForm(); if (form && !form.querySelector('.s4-audience')) injectAudience(); })
+    .observe(dialogContent, { childList: true, subtree: true });
+  dialogContent.addEventListener('click', e => {
+    const t = e.target.closest('[data-aud-toggle],[data-aud]'); const form = t && audForm(); if (!t || !form || !form.contains(t)) return;
+    e.preventDefault(); e.stopPropagation();
+    if (t.dataset.audToggle !== undefined) { injectAudience(t.getAttribute('aria-expanded') !== 'true'); dialogContent.querySelector('[data-aud][aria-checked=true]')?.focus(); return; }
+    const s = audState(audKey(form)); s.value = t.dataset.aud; s.touched = true; injectAudience(false); dialogContent.querySelector('[data-aud-toggle]')?.focus();
+  });
+  function openNew(discovery) {
+    AUD.key = 'new'; const s = audState('new');
+    if (!s.touched && !s.sent) { s.value = discovery ? 'public' : 'followers'; s.discovery = !!discovery; }   // an explicit choice in a kept draft stays
+    window.GerarAICheckinComposer.open();
+  }
+  compose = function () { openNew(false); };
+  editPost = function (id) {
+    AUD.key = id; const s = audState(id);
+    if (!s.touched) memberRpc('my_post_audiences', { p_post_ids: [id] }).then(rows => { const v = rows?.[0]?.audience; if (v && !s.touched) { s.value = v; injectAudience(); } })
+      .catch(err => console.warn('[GERARAI] my_post_audiences', err?.code, err?.message));
+    window.GerarAICheckinComposer.edit(id);
+  };
+  // Explicit Discovery / place-sharing publication: the only entry that starts at public (no such button while Maps are off).
+  window.GerarAIAudience = Object.freeze({ composeDiscovery: () => { if (!Remote.user) { compose(); return; } openNew(true); } });
+  const audMutate = Remote.mutateStoryCheckin;
+  Remote.mutateStoryCheckin = async function (req) {
+    const key = AUD.key, s = audState(key);
+    if (req?.p_content && !('audience' in req.p_content)) {
+      if (!s.edit) req.p_content.audience = s.value || 'followers';     // a new Story always states its audience
+      else if (s.touched && s.value) req.p_content.audience = s.value;   // an edit only when the owner changed it
+    }
+    if (req?.p_content && 'audience' in req.p_content) { s.sent = req.p_content.audience; s.value = s.sent; }
+    let out;
+    try { out = await audMutate.call(this, req); }
+    catch (err) { if (err?.code) delete s.sent; throw err; }          // no code = outcome unknown: the composer resends this exact request
+    if (key === 'new') AUD.byKey.delete('new'); else { s.touched = false; delete s.sent; }
+    return out;
+  };
+  const audEmergency = Remote.createEmergency;
+  Remote.createEmergency = function (args) {
+    const s = AUD.byKey.get('emergency');
+    return audEmergency.call(this, { ...args, report: { ...(args?.report || {}), audience: s?.value || 'followers' } });
+  };
+  window.addEventListener('gerarai:identity-changing', () => { AUD.byKey.clear(); AUD.key = 'new'; });
   /* ---------- start ---------- */
   Remote.onChange = (event, err) => {
     if (event === 'error') { fail(err); if (!Remote.user) { if (Gate.open) Gate.enter(); } else if (!Gate.open) Gate.setStatus('error'); return; }
