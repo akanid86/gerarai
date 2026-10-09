@@ -53,18 +53,32 @@
     Remote.progression = { available: false, state: null, badges: [], catalog: [], summary: null };
     syncPlaces();
   }
-  async function sessionRejected() {
+  // Boot states (app.js Gate.boot): checking-session → signed-in | signed-out. While the stored session is being checked the
+  // page shows only a neutral GERARAI splash: no Auth Wall, no member app, no member data.
+  // Verdict of the Auth server on the stored session: 'valid' | 'invalid' (401/403, or another user) | 'unverified' (network,
+  // 5xx, timeout). A session just issued by the Auth server in this page (link / code) has no stored token yet: 'valid'.
+  const SESSION_CHECK_TIMEOUT_MS = 15000;
+  async function sessionVerdict() {
     let token = '';
     try { token = JSON.parse(localStorage.getItem(AUTH_KEY) || 'null')?.access_token || ''; } catch { token = ''; }
-    if (!token) return false;                     // in-memory session just issued by the Auth server (link / code)
+    if (!token) return 'valid';
+    const ctl = typeof AbortController === 'function' ? new AbortController() : null;
+    const timer = ctl && setTimeout(() => ctl.abort(), SESSION_CHECK_TIMEOUT_MS);
     try {
       const cfg = window.GERARAI_CONFIG.supabase;
-      const res = await fetch(cfg.url + '/auth/v1/user', { headers: { apikey: cfg.anonKey, Authorization: 'Bearer ' + token }, cache: 'no-store' });
-      if (res.status === 401 || res.status === 403) return true;
-      if (!res.ok) return false;
+      const res = await fetch(cfg.url + '/auth/v1/user', { headers: { apikey: cfg.anonKey, Authorization: 'Bearer ' + token }, cache: 'no-store', signal: ctl?.signal });
+      if (res.status === 401 || res.status === 403) return 'invalid';
+      if (!res.ok) return 'unverified';
       const u = await res.json().catch(() => null);
-      return !!(u?.id && Remote.user?.id && u.id !== Remote.user.id);
-    } catch { return false; }                     // network: the data requests below fail on their own
+      if (!u?.id) return 'unverified';
+      return Remote.user?.id && u.id !== Remote.user.id ? 'invalid' : 'valid';
+    } catch { return 'unverified'; }
+    finally { if (timer) clearTimeout(timer); }
+  }
+  let bootVerdict = null;                         // set by the first member reload of this page (Remote.init)
+  function dropLocalSession() {                   // the in-page user and the stored token, whatever signOut() managed
+    Remote.user = null;
+    try { if (AUTH_KEY) localStorage.removeItem(AUTH_KEY); } catch { /* storage unavailable */ }
   }
   async function anonymousReload() {
     clearMemberState();
@@ -72,14 +86,30 @@
   }
   const memberReload = Remote.reload;
   Remote.reload = async function (...args) {
+    if (!Remote.user) bootVerdict ||= 'signed-out';
     if (!Remote.user) return anonymousReload();
+    let verdict = null;
+    const sessionRejected = async () => (verdict = await sessionVerdict()) === 'invalid';
     if (await sessionRejected()) {
       console.warn('[GERARAI] stored session rejected by the Auth server — signing out');
       await anonymousReload();
-      try { await Remote.signOut(); } catch { /* the local session is dropped either way */ }
+      try { await Remote.signOut(); } catch { /* dropped below either way */ }
+      if (Remote.user) dropLocalSession();
+      bootVerdict ||= 'signed-out';
       return;
     }
+    if (verdict === 'unverified' && !Gate.open) {
+      // first check of this page could not reach a verdict: show the signed-out Auth Wall (with the connection notice) and load
+      // nothing. The stored session is kept, so a later reload can still confirm it; nothing member-only is requested.
+      console.warn('[GERARAI] stored session could not be verified (network / server) — staying signed out');
+      Remote.user = null;
+      await anonymousReload();
+      bootVerdict ||= 'unverified';
+      return;
+    }
+    if (!Remote.user) bootVerdict ||= 'signed-out';
     if (!Remote.user) return anonymousReload();
+    bootVerdict ||= 'signed-in';
     resetFeed();
     const out = await memberReload.apply(this, args);
     resetFeed();
@@ -1024,12 +1054,12 @@
     if (event === 'error') { fail(err); if (!Remote.user) { if (Gate.open) Gate.enter(); } else if (!Gate.open) Gate.setStatus('error'); return; }
     if (event === 'SIGNED_IN' && Remote.user) {
       if (dialog.open && /เข้าสู่ระบบ|เช็กอีเมล|รหัสหรือลิงก์/.test(document.getElementById('dialog-title').textContent)) closeDialog();
-      Gate.setStatus('ready'); if (Gate.open) render(); else Gate.mount();
+      if (Gate.open) { Gate.setStatus('ready'); render(); } else { Gate.mount(); Gate.setStatus('ready'); }   // splash → app, never the Auth Wall
       toast(`ยินดีต้อนรับ ${Remote.profile?.display_name || ''}`.trim()); maybeOfferMigration();
     } else if (!Remote.user) {
       Gate.setStatus('ready'); if (Gate.open) Gate.enter(); else render();
       if (event === 'SIGNED_OUT') toast('ออกจากระบบแล้ว');
-    } else { if (Gate.open) render(); else Gate.mount(); }
+    } else { if (Gate.open) render(); else { Gate.mount(); Gate.setStatus('ready'); } }
   };
   let startError = null;
   console.info('[GERARAI] v0.7.0-dev · backend=supabase · project=' + (window.GERARAI_CONFIG.supabase?.url || '(none)') + (Remote.configProblem ? ' · CONFIG PROBLEM: ' + Remote.configProblem : ''));
@@ -1037,8 +1067,8 @@
   Remote.init().then(() => {
     console.info('[GERARAI] ระบบสมาชิกพร้อม · ' + (Remote.user ? 'เข้าสู่ระบบในชื่อ ' + Remote.user.email : 'ยังไม่เข้าสู่ระบบ') + ' · โพสต์จริง ' + Remote.data.posts.length + ' · สถานที่ ' + Object.keys(Remote.placeIds).length);
     if (cameFromAuthLink) history.replaceState(null, '', location.pathname + location.search + (Remote.user ? '#feed' : ''));
-    Gate.setStatus('ready');
-    if (Remote.user) Gate.mount(); else render();
+    if (Remote.user) { Gate.mount(); Gate.setStatus('ready'); }             // checking-session → signed-in (no Auth Wall in between)
+    else { Gate.setStatus(bootVerdict === 'unverified' ? 'error' : 'ready'); render(); }   // → signed-out
     if (cameFromAuthLink && Remote.user) toast(`ยินดีต้อนรับ ${Remote.profile?.display_name || ''}`.trim());
     if (authLinkError) toast('ลิงก์เข้าสู่ระบบหมดอายุหรือถูกใช้ไปแล้ว ขอลิงก์ใหม่อีกครั้ง');
     maybeOfferMigration();

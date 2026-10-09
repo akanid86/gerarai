@@ -166,7 +166,10 @@ if(CONFIG.backend==='local'){const u=new URL(location.href);u.searchParams.delet
  * gate meanwhile (legal pages render there). Any other route, including deep links, shows the landing; the requested
  * route is remembered and opened after sign-in. live.js mounts the app (Gate.mount) once the session is confirmed and
  * the member data is loaded, and returns here (Gate.enter) on sign-out / session expiry. The ?backend=local prototype has
- * no gate (config.js never allows it on gerarai.com). */
+ * no gate (config.js never allows it on gerarai.com).
+ * Three explicit boot states (Gate.boot, also <html data-boot>): 'checking-session' while live.js verifies a restored
+ * session with the Auth server (status checking / entering) — only a neutral GERARAI splash, no Auth Wall, no app shell, no
+ * member data; 'signed-out' (status ready / error) — the Auth Wall; 'signed-in' — the member app (Gate.mount). */
 const Gate=(()=>{
  const enabled=CONFIG.backend==='supabase';
  const PUBLIC=/^(terms|community|privacy|emergency-safety|location-safety|contact|appeal|copyright|data-rights)(\?|$)/;
@@ -192,7 +195,7 @@ const Gate=(()=>{
   shell.forEach(n=>n.remove());
   if(!box.isConnected)document.body.insertBefore(box,dialog);
   box.insertBefore(main,box.querySelector('.gate-foot'));
-  main.innerHTML='';
+  main.innerHTML='';mark();
   document.documentElement.classList.remove('gerarai-app');document.documentElement.classList.add('gerarai-gated');
   const h=decodeURIComponent(location.hash.slice(1));
   if(isPublic(h))route=h;else{route='gate';if(!start&&location.hash&&!AUTH_HASH.test(h))history.replaceState(null,'',location.pathname+location.search);}
@@ -206,17 +209,20 @@ const Gate=(()=>{
   shell.forEach(n=>document.body.insertBefore(n,dialog));
   layout.appendChild(main);main.innerHTML='';
   document.documentElement.classList.remove('gerarai-gated');document.documentElement.classList.add('gerarai-app');
-  route=target;
+  route=target;mark();
   if(location.hash!=='#'+target)history.replaceState(null,'',location.pathname+location.search+'#'+target);
   render();
  }
- function setStatus(s){status=s;if(!open&&route==='gate')renderGate();}
+ const bootOf=()=>open?'signed-in':(status==='checking'||status==='entering')?'checking-session':'signed-out';
+ function mark(){const b=bootOf();document.documentElement.dataset.boot=b;if(el){const c=b==='checking-session';el.querySelectorAll('.gate-top,.gate-foot').forEach(n=>{n.hidden=c;});}}
+ function setStatus(s){status=s;mark();if(!open&&route==='gate')renderGate();}
  function shellQuery(sel){for(const n of shell){if(n.matches(sel))return n;const q=n.querySelector(sel);if(q)return q;}return null;}
  if(!enabled)document.documentElement.classList.add('gerarai-app');
- return Object.freeze({enabled,get open(){return open;},get status(){return status;},get wanted(){return wanted;},isPublic,routeFor,enter,mount,setStatus,shellQuery,links:LINKS});
+ mark();
+ return Object.freeze({enabled,get open(){return open;},get status(){return status;},get boot(){return bootOf();},get wanted(){return wanted;},isPublic,routeFor,enter,mount,setStatus,shellQuery,links:LINKS});
 })();
 window.GerarAIGate=Gate;
 function gateRoute(r){return Gate.routeFor(r);}
 const GATE_STATUS={checking:'กำลังตรวจสอบการเข้าสู่ระบบ…',entering:'กำลังเข้าสู่ GERARAI…',ready:'',error:'เชื่อมต่อระบบสมาชิกไม่ได้ในขณะนี้ ลองโหลดหน้าใหม่อีกครั้ง'};
-function renderGate(){main.innerHTML=`<section class="gate-landing" aria-labelledby="gate-title"><div class="gate-card"><img class="gate-mark" src="assets/gerarai-mark.png" srcset="assets/gerarai-mark.png 1x, assets/gerarai-mark@2x.png 2x" width="120" height="72" alt=""><p class="gate-kicker">Open Beta</p><h1 id="gate-title">GERARAI</h1><p class="gate-tagline">Real Life Social Adventure</p><p class="gate-lead">แบ่งปันเรื่องราวการเดินทางและการค้นพบสถานที่ในชีวิตจริง ช่วง Open Beta ใช้งานได้เฉพาะสมาชิกที่เข้าสู่ระบบแล้ว</p><div class="gate-actions"><button class="primary gate-signin" data-action="signin">เข้าสู่ระบบ / สมัครสมาชิกด้วยอีเมล</button></div><p class="gate-help">ไม่ต้องตั้งรหัสผ่าน เราจะส่งลิงก์และรหัสเข้าสู่ระบบไปที่อีเมลของคุณ ถ้ายังไม่มีบัญชีจะสร้างให้อัตโนมัติ</p><p class="gate-status" role="status" aria-live="polite">${esc(GATE_STATUS[Gate.status]||'')}</p><p class="gate-legal-note">ก่อนเริ่มโพสต์หรือโต้ตอบ คุณจะได้อ่านและยืนยัน<a href="#terms">ข้อกำหนดการใช้บริการ</a>และ<a href="#community">มาตรฐานชุมชน</a> และรับทราบ<a href="#privacy">ประกาศความเป็นส่วนตัว</a></p></div></section>`;}
+function renderGate(){if(Gate.boot==='checking-session'){main.innerHTML=`<section class="gate-splash" role="status" aria-live="polite" aria-busy="true" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;min-height:60vh;text-align:center"><img class="gate-splash-mark" src="assets/gerarai-mark.png" srcset="assets/gerarai-mark.png 1x, assets/gerarai-mark@2x.png 2x" width="96" height="58" alt="GERARAI"><p class="gate-splash-text" style="margin:0;color:var(--muted)">${esc(Gate.status==='entering'?GATE_STATUS.entering:'กำลังตรวจสอบการเข้าสู่ระบบ...')}</p></section>`;return;}main.innerHTML=`<section class="gate-landing" aria-labelledby="gate-title"><div class="gate-card"><img class="gate-mark" src="assets/gerarai-mark.png" srcset="assets/gerarai-mark.png 1x, assets/gerarai-mark@2x.png 2x" width="120" height="72" alt=""><p class="gate-kicker">Open Beta</p><h1 id="gate-title">GERARAI</h1><p class="gate-tagline">Real Life Social Adventure</p><p class="gate-lead">แบ่งปันเรื่องราวการเดินทางและการค้นพบสถานที่ในชีวิตจริง ช่วง Open Beta ใช้งานได้เฉพาะสมาชิกที่เข้าสู่ระบบแล้ว</p><div class="gate-actions"><button class="primary gate-signin" data-action="signin">เข้าสู่ระบบ / สมัครสมาชิกด้วยอีเมล</button></div><p class="gate-help">ไม่ต้องตั้งรหัสผ่าน เราจะส่งลิงก์และรหัสเข้าสู่ระบบไปที่อีเมลของคุณ ถ้ายังไม่มีบัญชีจะสร้างให้อัตโนมัติ</p><p class="gate-status" role="status" aria-live="polite">${esc(GATE_STATUS[Gate.status]||'')}</p><p class="gate-legal-note">ก่อนเริ่มโพสต์หรือโต้ตอบ คุณจะได้อ่านและยืนยัน<a href="#terms">ข้อกำหนดการใช้บริการ</a>และ<a href="#community">มาตรฐานชุมชน</a> และรับทราบ<a href="#privacy">ประกาศความเป็นส่วนตัว</a></p></div></section>`;}
 route=gateRoute(location.hash.slice(1)||'feed');decorateIcons();if(Gate.enabled)Gate.enter(true);else render();
