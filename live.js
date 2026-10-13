@@ -7,6 +7,7 @@
 (function () {
   const Remote = window.GerarAIRemote;
   if (!Remote || !Remote.enabled) return;
+  const UI = (window.GERARAI_CONFIG && window.GERARAI_CONFIG.ui) || {};   // UX flags (config.js ui): storyRail, miniProfileCard
   window.GERARAI_LIVE = true;
   document.documentElement.classList.add('live');
 
@@ -763,7 +764,9 @@
     const a = b.dataset.action, id = b.dataset.id;
     if (a === 'signin') { stop(e); signInDialog(); return; }
     if (a === 'signout') { stop(e); signOut(); return; }
-    if (b.dataset.person) { const p = findPost(b.dataset.person); if (p?.remote && !p.own) { stop(e); personDialog(p); drawPersonProgress(p); } return; }
+    // UX cleanup (2026-10-14): a member's name / avatar opens their full Public Profile directly (Follow, block and visibility
+    // rules live there). The Mini Profile card is kept behind config.js ui.miniProfileCard (default off).
+    if (b.dataset.person) { const p = findPost(b.dataset.person); if (p?.remote && !p.own && Remote.isId(p.authorId)) { stop(e); if (UI.miniProfileCard === true) { personDialog(p); drawPersonProgress(p); } else { if (dialog.open) closeDialog(); navigate('u/' + p.authorId); } } return; }
     if (b.classList.contains('avatar-header') && !Remote.user) { stop(e); signInDialog(); return; }
     if (a === 'class-paths') { stop(e); classPathsDialog(); return; }
     if (b.dataset.publicTab) { stop(e); publicTab = b.dataset.publicTab; render(); return; }
@@ -862,9 +865,10 @@
     finally { if (seq === FF.seq) FF.loading = false; }
     drawFeed();
   }
-  // Open Beta demo cleanup (2026-10-09): no sample story bubbles or sample "cities to visit" card in member mode; only the
-  // working "Your Story" (opens the Story composer) stays.
-  storiesMarkup = () => `<div class="panel stories"><button class="story" data-action="compose"><span class="story-ring mine">${icon('plus')}</span><small>Your Story</small></button></div>`;
+  // Open Beta demo cleanup (2026-10-09): no sample story bubbles or sample "cities to visit" card in member mode.
+  // UX cleanup (2026-10-14): the "Your Story" rail is hidden until a real Story product exists; the markup is kept for that
+  // feature behind config.js ui.storyRail (default off). Creating a Story stays available from the composer entry points.
+  storiesMarkup = () => UI.storyRail === true ? `<div class="panel stories"><button class="story" data-action="compose"><span class="story-ring mine">${icon('plus')}</span><small>Your Story</small></button></div>` : '';
   const demoRightRail = rightRail;
   rightRail = () => demoRightRail().replace(/<section class="panel rail-section">[\s\S]*?<\/section>/, '');
   feedPosts = () => feedList();                                 // member Feed = Following only (no sample or global Stories)

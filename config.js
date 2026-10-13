@@ -34,6 +34,9 @@ window.GERARAI_CONFIG = Object.freeze({
    * R17 (owner-approved 2026-10-14): enabled. enabled:false restores the R16 check-in search exactly (GERARAI AREA / VENUE only).
    * Google Places stays OFF. */
   checkin: { external: { enabled: true, provider: 'geoapify' } },
+  /* UX flags (2026-10-14 cleanup). storyRail: the "Your Story" rail on the Feed (hidden until a real Story product exists).
+   * miniProfileCard: the small member card shown before the full profile (off: a member's name / avatar opens the profile). */
+  ui: { storyRail: false, miniProfileCard: false },
   supabase: {
     url: 'https://fqjceezraqpotjkzgjwo.supabase.co',
     anonKey: 'sb_publishable_7wAGMpR59dBpXor9ADgomA_w8JHE_1m' // publishable key — ใส่ในหน้าเว็บได้ สิทธิ์ถูกจำกัดด้วย RLS
