@@ -128,6 +128,8 @@
         setStatus(rows.length?`${rows.length} Discoveries${next?' · ยังมีเพิ่มเติม':''}`:'ยังไม่มี Discovery ในบริเวณนี้ ลองเลื่อนแผนที่หรือแชร์สิ่งที่คุณเจอ');
         if(rows.length>=600&&next)setStatus('แสดง 600 Discoveries แล้ว ซูมเข้าเพื่อดูบริเวณที่สนใจ');
         more.hidden=!next||rows.length>=600;
+        // venue pins (public venue coordinates of venues on Stories this member may see); a failure leaves Discoveries as they are
+        if(!append&&remote()&&R.venuePinsInViewport&&!emergencyOn)R.venuePinsInViewport(b,abort.signal).then(p=>{if(!disposed&&run===generation)provider?.drawVenues?.(p);},()=>{if(!disposed&&run===generation)provider?.drawVenues?.([]);});
         return true;
       } catch(e) {
         if(disposed||run!==generation||e.name==='AbortError')return;

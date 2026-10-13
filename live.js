@@ -1100,6 +1100,61 @@
     const rows = await ckSelect('places', 'id,name,city,source', [['name', t]], { status: 'published', is_sample: 'false' });
     return ckSort(q, rows, v => [v.name], v => v.name || '');
   };
+  /* ---------- External Check-in Provider v0.1 (Geoapify first; provider-agnostic) ---------- */
+  // Extra AREA / VENUE suggestions from an external provider, through the GERARAI Edge Function `checkin-places` only:
+  // the browser never holds a provider key and never talks to the provider. Off unless config.js checkin.external.enabled.
+  // Results carry no coordinates. Selecting one asks the server to create / reuse a reference from what the provider
+  // returned to the server (the client sends only provider + provider_place_id): an AREA reference has no coordinates at
+  // all; a VENUE reference uses the provider's public venue coordinates, never the member's location.
+  // Location bias is optional, explicit, rounded to ~1 km and used only for that search request.
+  const EXT_CFG = (window.GERARAI_CONFIG.checkin && window.GERARAI_CONFIG.checkin.external) || {};
+  const EXTERNAL_SEARCH_MIN = 3, EXTERNAL_TIMEOUT_MS = 8000;
+  async function extCall(body, signal) {
+    let token = '';
+    try { token = JSON.parse(localStorage.getItem(AUTH_KEY) || 'null')?.access_token || ''; } catch { token = ''; }
+    if (!Remote.user || !token) throw Object.assign(new Error('ต้องเข้าสู่ระบบก่อน'), { code: 'auth' });
+    const cfg = window.GERARAI_CONFIG.supabase, ctrl = new AbortController(), t = setTimeout(() => ctrl.abort(), EXTERNAL_TIMEOUT_MS);
+    signal?.addEventListener?.('abort', () => ctrl.abort());
+    try {
+      const res = await fetch(cfg.url + '/functions/v1/checkin-places', { method: 'POST', cache: 'no-store', signal: ctrl.signal,
+        headers: { apikey: cfg.anonKey, Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const out = await res.json().catch(() => null);
+      if (!res.ok || !out || out.error) throw Object.assign(new Error(out?.error || 'HTTP ' + res.status), { code: out?.error || String(res.status), status: res.status });
+      return out;
+    } finally { clearTimeout(t); }
+  }
+  if (EXT_CFG.enabled === true) {
+    Remote.externalSearchMin = EXTERNAL_SEARCH_MIN;
+    Remote.searchExternalPlaces = async function (term = '', opts = {}) {
+      const q = ckTerm(term); if ([...q].length < EXTERNAL_SEARCH_MIN) return { results: [], attribution: null };
+      const bias = opts.bias && Number.isFinite(+opts.bias.lat) && Number.isFinite(+opts.bias.lng)
+        ? { lat: Math.round(+opts.bias.lat * 100) / 100, lng: Math.round(+opts.bias.lng * 100) / 100 } : undefined;
+      const out = await extCall({ action: 'search', q, lang: (document.documentElement.lang || 'th').slice(0, 2) === 'en' ? 'en' : 'th', ...(bias ? { bias } : {}) }, opts.signal);
+      const ok = r => r && typeof r.provider_place_id === 'string' && (r.result_type === 'area' || r.result_type === 'venue') && typeof r.display_name === 'string';
+      return { results: (Array.isArray(out.results) ? out.results : []).filter(ok).slice(0, 8)
+        .map(r => ({ provider: String(r.provider || ''), provider_place_id: r.provider_place_id, result_type: r.result_type, display_name: r.display_name,
+          context: r.context || '', attribution: r.attribution || null })), attribution: out.attribution || null };
+    };
+    Remote.selectExternalPlace = async function (r) {
+      const out = await extCall({ action: 'select', provider: r.provider, provider_place_id: r.provider_place_id });
+      if (out.kind === 'area' && out.area?.id) return { kind: 'area', item: { id: out.area.id, display_name: out.area.display_name, origin: 'external', attribution: out.area.attribution || null } };
+      if (out.kind === 'venue' && out.venue?.id) return { kind: 'venue', item: { id: out.venue.id, name: out.venue.name, city: out.venue.city || '', origin: 'external', attribution: out.venue.attribution || null } };
+      throw Object.assign(new Error('selection_unavailable'), { code: 'selection_unavailable' });
+    };
+  }
+  // Map: venue pins (public venue coordinates) for venues this member can already see on a Story. AREA never has a pin.
+  Remote.venuePinsInViewport = async function (b, signal) {
+    let token = '';
+    try { token = JSON.parse(localStorage.getItem(AUTH_KEY) || 'null')?.access_token || ''; } catch { token = ''; }
+    if (!Remote.user || !token) return [];
+    const cfg = window.GERARAI_CONFIG.supabase;
+    const res = await fetch(cfg.url + '/rest/v1/rpc/venue_pins_in_viewport', { method: 'POST', cache: 'no-store', signal,
+      headers: { apikey: cfg.anonKey, Authorization: 'Bearer ' + token, 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ p_south: b.south, p_west: b.west, p_north: b.north, p_east: b.east, p_limit: 200 }) });
+    const body = await res.json().catch(() => null);
+    if (!res.ok || !Array.isArray(body)) throw Object.assign(new Error(body?.message || 'HTTP ' + res.status), { code: body?.code || String(res.status) });
+    return body.filter(p => p && Number.isFinite(p.latitude) && Number.isFinite(p.longitude) && typeof p.name === 'string');
+  };
   /* ---------- start ---------- */
   Remote.onChange = (event, err) => {
     if (event === 'error') { fail(err); if (!Remote.user) { if (Gate.open) Gate.enter(); } else if (!Gate.open) Gate.setStatus('error'); return; }

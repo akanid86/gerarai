@@ -30,6 +30,10 @@ window.GERARAI_CONFIG = Object.freeze({
       mapId: ''
     }
   },
+  /* External Check-in Provider v0.1 (Geoapify through the GERARAI Edge Function `checkin-places`; no provider key here).
+   * R17 (owner-approved 2026-10-14): enabled. enabled:false restores the R16 check-in search exactly (GERARAI AREA / VENUE only).
+   * Google Places stays OFF. */
+  checkin: { external: { enabled: true, provider: 'geoapify' } },
   supabase: {
     url: 'https://fqjceezraqpotjkzgjwo.supabase.co',
     anonKey: 'sb_publishable_7wAGMpR59dBpXor9ADgomA_w8JHE_1m' // publishable key — ใส่ในหน้าเว็บได้ สิทธิ์ถูกจำกัดด้วย RLS

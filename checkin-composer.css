@@ -16,3 +16,14 @@
 .s4-map { height:260px; border-radius:12px; overflow:hidden; margin-bottom:12px; background:#eef3ec; }
 .s4-composer .form-submit { flex-wrap:wrap; }
 @media(max-width:480px){.s4-map{height:220px}.s4-composer .form-submit > button{flex:1;min-width:100px}}
+/* External Check-in Provider v0.1: third-party suggestions are visibly labelled, never styled as GERARAI catalogue rows */
+.s4-near { display:flex; gap:8px; align-items:center; font-size:.85rem; color:#5b6476; margin:-4px 0 8px; }
+.s4-choices .s4-external { display:flex; justify-content:space-between; gap:8px; align-items:baseline; border-style:dashed; }
+.s4-external small { color:#5b6476; font-weight:400; }
+.s4-provider { flex:none; font-size:.72rem; padding:2px 8px; border-radius:999px; background:#eef0f4; color:#3a4255; white-space:nowrap; }
+.s4-attribution { font-size:.72rem; color:#5b6476; margin:6px 0 0; }
+.s4-attribution a { color:inherit; }
+.venue-pin { display:inline-flex; align-items:center; gap:4px; transform:translate(-14px,-30px); white-space:nowrap; }
+.venue-pin b { width:26px; height:26px; border-radius:50% 50% 50% 0; transform:rotate(-45deg); background:#2d4fd8; border:2px solid #fff; box-shadow:0 2px 6px rgba(16,27,48,.35); }
+.venue-pin.external b { background:#fff; border:2px solid #5b6476; }
+.venue-pin span { font-size:.72rem; background:rgba(255,255,255,.92); padding:1px 6px; border-radius:6px; color:#101b30; }

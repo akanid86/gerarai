@@ -6,7 +6,7 @@ window.GerarAIMapProvider = {
     const L=window.L, map=L.map(element,{worldCopyJump:true}).setView(center,zoom);
     const cfg=window.GERARAI_CONFIG.map || {};
     const tiles=L.tileLayer(cfg.tileUrl || 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:cfg.attribution || '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors'}).addTo(map);
-    const layer=L.layerGroup().addTo(map), emergencyLayer=L.layerGroup().addTo(map); let pin=null, failures=0;
+    const layer=L.layerGroup().addTo(map), emergencyLayer=L.layerGroup().addTo(map), venueLayer=L.layerGroup().addTo(map); let pin=null, failures=0;
     tiles.on('tileload',()=>{failures=0;onTiles?.(true);});
     tiles.on('tileerror',()=>{if(++failures>=3)onTiles?.(false);});
     map.on('moveend',()=>onMove?.());
@@ -39,6 +39,18 @@ window.GerarAIMapProvider = {
         });
       },
       clearEmergency(){emergencyLayer.clearLayers();},
+      /* Venue pins: a venue's PUBLIC coordinates (GERARAI venue or an external provider reference), only for venues the
+       * member can already see on a Story (server: venue_pins_in_viewport). External ones are labelled with their source. */
+      drawVenues(rows){
+        venueLayer.clearLayers();
+        const esc=t=>String(t??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        (rows||[]).forEach(v=>{
+          if(!Number.isFinite(v.latitude)||!Number.isFinite(v.longitude))return;
+          const ext=v.origin==='external';
+          const m=L.marker([v.latitude,v.longitude],{keyboard:true,title:v.name,alt:v.name,zIndexOffset:500,icon:L.divIcon({className:'venue-marker',html:`<span class="venue-pin ${ext?'external':''}"><b aria-hidden="true"></b><span>${esc(v.name)}</span></span>`,iconSize:null})}).addTo(venueLayer);
+          m.bindPopup(`<strong>📍 ${esc(v.name)}</strong><br><small>${ext?'ข้อมูลสถานที่จากผู้ให้บริการภายนอก · Powered by <a href="https://www.geoapify.com/" target="_blank" rel="noopener">Geoapify</a> · © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors':'สถานที่ใน GERARAI'}</small><br><small>${v.stories} เรื่องราว</small>`);
+        });
+      },
       setEmergencyMode(on){element.classList.toggle('emergency-mode',!!on);},
       destroy(){map.remove();}
     };
@@ -238,6 +250,7 @@ async function createGoogleMap(element, options={}) {
       });
     },
     clearEmergency,
+    drawVenues(){},
     setEmergencyMode(on){element.classList.toggle('emergency-mode',!!on);},
     destroy(){disposed=true;externalRun++;clearTimeout(searchTimer);idleListener?.remove?.();clickListener?.remove?.();clearDiscovery();clearExternal();clearEmergency();if(pin)pin.map=null;info.close();}
   };
