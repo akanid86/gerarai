@@ -20,7 +20,7 @@
     'author:profiles!posts_author_id_fkey(display_name,handle,avatar_path,avatar_type,pixel_avatar_data),' +
     // M2 Place Disclosure: no place embed — public presentation comes from story_checkins() only
     'post_media(position,media(path,width,height)),' +
-    'likes(count),comments(count)';
+    'comments(count)';   // R19: like counts come from post_like_counts() (liker identities are owner-only: post_likers())
 
   const blank = () => ({ posts: [], liked: [], saved: [], savedPlaces: [], following: [], blocked: [] });
   const R = {
@@ -69,7 +69,18 @@
     if (error || epoch !== (R.epoch || 0)) return;   // no URL is better than a wrong one; the Story text still shows
     (data || []).forEach(r => { if (r && !r.error && r.path && r.signedUrl) signed.set(r.path, { url: r.signedUrl, exp: at + MEDIA_TTL * 1000 }); });
   }
-  async function signPosts(posts) { await signMedia(posts.map(p => p.imagePath)); posts.forEach(p => { if (p.imagePath) p.image = mediaUrl(p.imagePath); }); }
+  async function signPosts(posts) { await Promise.all([signMedia(posts.map(p => p.imagePath)), attachLikeCounts(posts)]); posts.forEach(p => { if (p.imagePath) p.image = mediaUrl(p.imagePath); }); }
+  // R19: public like counts through the definer RPC post_like_counts (only Stories the viewer may see). The likes table itself
+  // returns only the viewer's own like row, so no client path can list who liked someone else's Story.
+  async function attachLikeCounts(posts) {
+    const ids = [...new Set(posts.filter(p => p && p.remote && UUID.test(p.id)).map(p => p.id))];
+    for (let i = 0; i < ids.length; i += 200) {
+      const { data, error } = await sb.rpc('post_like_counts', { p_ids: ids.slice(i, i + 200) });
+      if (error) { console.warn('[GERARAI] post_like_counts', error.code); continue; }
+      const m = new Map((data || []).map(r => [r.post_id, Number(r.likes) || 0]));
+      posts.forEach(p => { if (m.has(p.id)) p.likes = Math.max(0, m.get(p.id) - (R.data.liked.includes(p.id) ? 1 : 0)); });
+    }
+  }
   window.addEventListener('gerarai:identity-changing', () => signed.clear());
   document.addEventListener('error', ev => {
     const img = ev.target; if (!(img instanceof HTMLImageElement) || img.dataset.mediaRetry) return;
@@ -95,7 +106,7 @@
       place: '', placeName: '', placeDisclosure: 'private', ownPlace: null,
       imagePath: media?.path || '', image: media ? mediaUrl(media.path) : '',
       title: r.title, body: r.body, tags: r.tags || [],
-      likes: (r.likes?.[0]?.count || 0) - (liked ? 1 : 0),   // app.js บวกของผู้ใช้เองตอนแสดงผล
+      likes: 0,   // R19: set by attachLikeCounts() (count − own like; app.js adds the own like back when drawing)
       comments: r.comments?.[0]?.count || 0,
       own: r.author_id === uid(), following: false
     };

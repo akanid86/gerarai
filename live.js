@@ -755,6 +755,163 @@
     toast(failed ? `เผยแพร่ ${done} เรื่อง ไม่สำเร็จ ${failed} เรื่อง (ยังอยู่บนเครื่องนี้)` : `เผยแพร่ ${done} เรื่องราวแล้ว`);
   }
 
+  /* ---------- R19 i18n: every new string is a key (Thai first; English table ready; config.js ui.lang or <html lang>) ---------- */
+  const I18N = {
+    th: {
+      'notif.title': 'การแจ้งเตือน', 'notif.readAll': 'อ่านทั้งหมด', 'notif.loading': 'กำลังโหลด…', 'notif.error': 'โหลดการแจ้งเตือนไม่สำเร็จ กรุณาลองใหม่',
+      'notif.empty': 'ยังไม่มีการแจ้งเตือน', 'notif.emptyHelp': 'เมื่อมีคนถูกใจ แสดงความคิดเห็น หรือติดตามคุณ จะแสดงที่นี่', 'notif.more': 'ดูเพิ่มเติม',
+      'notif.like': '{actor} ถูกใจเรื่องราวของคุณ', 'notif.comment': '{actor} แสดงความคิดเห็นในเรื่องราวของคุณ', 'notif.follow': '{actor} เริ่มติดตามคุณ',
+      'notif.followBack': '{actor} ติดตามคุณกลับแล้ว', 'notif.badge': 'คุณได้รับเหรียญ {badge}', 'notif.unavailable': 'เนื้อหานี้ไม่สามารถเปิดได้แล้ว',
+      'notif.unread': 'ยังไม่อ่าน', 'notif.member': 'สมาชิก GERARAI', 'notif.bell': 'การแจ้งเตือน', 'notif.bellUnread': 'การแจ้งเตือน ({n} รายการที่ยังไม่อ่าน)',
+      'likers.menu': 'ดูคนที่ถูกใจ', 'likers.title': 'คนที่ถูกใจเรื่องราวนี้', 'likers.note': 'รายชื่อนี้เห็นได้เฉพาะคุณในฐานะเจ้าของเรื่องราว',
+      'likers.empty': 'ยังไม่มีใครถูกใจเรื่องราวนี้', 'likers.error': 'โหลดรายชื่อไม่สำเร็จ', 'likers.more': 'ดูเพิ่มเติม',
+      'share.menu': 'แชร์ลิงก์', 'share.text': 'เรื่องราวบน GERARAI', 'share.copied': 'คัดลอกลิงก์แล้ว', 'share.title': 'แชร์เรื่องราว',
+      'share.manual': 'คัดลอกลิงก์นี้เพื่อแชร์ ผู้รับต้องเข้าสู่ระบบและมีสิทธิ์เห็นเรื่องราวนี้', 'share.link': 'ลิงก์'
+    },
+    en: {
+      'notif.title': 'Notifications', 'notif.readAll': 'Read all', 'notif.loading': 'Loading…', 'notif.error': 'Could not load notifications. Please try again.',
+      'notif.empty': 'No notifications yet', 'notif.emptyHelp': 'Likes, comments and new followers will appear here.', 'notif.more': 'Show more',
+      'notif.like': '{actor} liked your story', 'notif.comment': '{actor} commented on your story', 'notif.follow': '{actor} started following you',
+      'notif.followBack': '{actor} followed you back', 'notif.badge': 'You earned the {badge} badge', 'notif.unavailable': 'This content is no longer available',
+      'notif.unread': 'Unread', 'notif.member': 'GERARAI member', 'notif.bell': 'Notifications', 'notif.bellUnread': 'Notifications ({n} unread)',
+      'likers.menu': 'See who liked this', 'likers.title': 'People who liked this story', 'likers.note': 'Only you, as the author, can see this list',
+      'likers.empty': 'No likes yet', 'likers.error': 'Could not load the list', 'likers.more': 'Show more',
+      'share.menu': 'Share link', 'share.text': 'A story on GERARAI', 'share.copied': 'Link copied', 'share.title': 'Share story',
+      'share.manual': 'Copy this link to share it. Recipients must sign in and be allowed to see the story.', 'share.link': 'Link'
+    }
+  };
+  const lang = () => { const l = String((UI && UI.lang) || document.documentElement.lang || 'th').slice(0, 2).toLowerCase(); return I18N[l] ? l : 'th'; };
+  const t = (key, vars = {}) => String((I18N[lang()] || {})[key] ?? I18N.th[key] ?? key).replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? '');
+  window.GerarAII18n = Object.freeze({ t, lang, add: (code, table) => { I18N[code] = Object.assign(I18N[code] || {}, table); } });
+
+  /* ---------- R19 bell: real unread count (navigation, window focus, every 60 s while visible; no realtime / push) ---------- */
+  const Bell = { seq: 0, last: 0 };
+  function setBell(n) {
+    document.querySelectorAll('.notification-button').forEach(btn => {
+      btn.classList.toggle('has-unread', n > 0); btn.dataset.unread = String(n);
+      btn.setAttribute('aria-label', n > 0 ? t('notif.bellUnread', { n }) : t('notif.bell'));
+    });
+  }
+  async function refreshBell(force) {
+    if (!Remote.user || !(Gate && Gate.open)) { setBell(0); return; }
+    if (!force && Date.now() - Bell.last < 4000) return;
+    Bell.last = Date.now(); const seq = ++Bell.seq;
+    try { const n = Number(await memberRpc('my_unread_notification_count', {})) || 0; if (seq === Bell.seq) setBell(n); }
+    catch (err) { console.warn('[GERARAI] unread count', err?.code); }
+  }
+  window.addEventListener('hashchange', () => refreshBell(false));
+  window.addEventListener('focus', () => refreshBell(true));
+  setInterval(() => { if (document.visibilityState === 'visible') refreshBell(true); }, 60000);
+  window.addEventListener('gerarai:identity-changing', () => { Bell.seq++; setBell(0); });
+  setBell(0); setTimeout(() => refreshBell(true), 1500);
+
+  /* ---------- R19 Notification Center: real rows only, re-authorized by the server on every read / open ---------- */
+  const NC = { items: [], next: null, seq: 0 };
+  const PAGE = 20;
+  function notifText(n) {
+    const actor = `<b>${esc(n.actor_name || (n.actor_handle ? '@' + n.actor_handle : t('notif.member')))}</b>`;
+    if (n.kind === 'like') return t('notif.like', { actor });
+    if (n.kind === 'comment') return t('notif.comment', { actor });
+    if (n.kind === 'follow') return t(n.follow_back ? 'notif.followBack' : 'notif.follow', { actor });
+    if (n.kind === 'badge_awarded') return t('notif.badge', { badge: `<b>${esc(lang() === 'en' ? (n.badge_name_en || n.badge_name_th || n.badge_code) : (n.badge_name_th || n.badge_name_en || n.badge_code))}</b>` });
+    return '';
+  }
+  function notifMarkup(n) {
+    const pic = n.kind === 'badge_awarded' ? '<span class="avatar notif-badge" aria-hidden="true">🏅</span>'
+      : `<span class="avatar" aria-hidden="true">${Avatar.inner({ name: n.actor_name || n.actor_handle || 'G', photoUrl: Remote.avatarUrl(n.actor_avatar_path), avatarType: n.actor_avatar_type || (n.actor_avatar_path ? 'photo' : 'initial'), pixelSpec: n.actor_pixel || null })}</span>`;
+    return `<button class="notif-item${n.is_read ? '' : ' unread'}" data-notif="${esc(n.id)}" role="listitem">${pic}<span class="notif-body"><span class="notif-text">${notifText(n)}</span>`
+      + `${n.post_title ? `<small class="notif-context">“${esc(n.post_title)}”</small>` : ''}`
+      + `<small class="notif-time">${esc(Remote.relTime(n.created_at))}${n.is_read ? '' : ` · <span class="notif-unread-label">${t('notif.unread')}</span>`}</small></span></button>`;
+  }
+  function drawNotifs() {
+    const box = document.getElementById('notif-list'); if (!box) return;
+    box.innerHTML = NC.items.length
+      ? NC.items.map(notifMarkup).join('') + (NC.next ? `<button class="secondary notif-more" data-action="notif-more">${t('notif.more')}</button>` : '')
+      : `<div class="notif-empty"><h3>${t('notif.empty')}</h3><p class="form-help">${t('notif.emptyHelp')}</p></div>`;
+  }
+  async function loadNotifs(append) {
+    const seq = ++NC.seq, cur = append ? NC.next : null;
+    try {
+      const rows = (await memberRpc('my_notifications', { p_before: cur ? cur.created_at : null, p_before_id: cur ? cur.id : null, p_limit: PAGE })) || [];
+      if (seq !== NC.seq || !document.getElementById('notif-list')) return;
+      NC.items = append ? NC.items.concat(rows) : rows;
+      NC.next = rows.length === PAGE ? { created_at: rows[PAGE - 1].created_at, id: rows[PAGE - 1].id } : null;
+      drawNotifs();
+    } catch (err) {
+      const box = document.getElementById('notif-list');
+      if (seq === NC.seq && box) box.innerHTML = `<p class="form-error" role="alert">${t('notif.error')}</p>`;
+    }
+  }
+  function openNotifications() {
+    NC.items = []; NC.next = null;
+    openDialog(t('notif.title'), `<div class="notif-center"><div class="notif-head"><button class="text-button" data-action="notif-read-all">${t('notif.readAll')}</button></div><div id="notif-list" role="list"><p class="form-help" role="status">${t('notif.loading')}</p></div></div>`);
+    loadNotifs(false); refreshBell(true);   // opening the Center marks nothing read (D3)
+  }
+  async function openNotificationItem(id, btn) {
+    if (!Remote.isId(id)) return;
+    let r = null;
+    try { r = await memberRpc('open_notification', { p_id: id }); } catch (err) { toast(Remote.errorText(err)); return; }
+    const item = NC.items.find(x => x.id === id); if (item) item.is_read = true;
+    refreshBell(true);
+    if (!r || !r.ok) {
+      if (btn && document.body.contains(btn)) { btn.classList.remove('unread'); btn.classList.add('unavailable'); btn.disabled = true; btn.querySelector('.notif-body').innerHTML = `<span class="notif-text">${t('notif.unavailable')}</span>`; }
+      return;
+    }
+    const to = r.kind === 'like' || r.kind === 'comment' ? (Remote.isId(r.post_id) ? 'post/' + r.post_id : null)
+      : r.kind === 'follow' ? (Remote.isId(r.actor_id) ? 'u/' + r.actor_id : null) : r.kind === 'badge_awarded' ? 'profile' : null;
+    if (!to) return;
+    closeDialog(); navigate(to);
+  }
+  async function readAllNotifications(btn) {
+    busy(btn, true, '…');
+    try { await memberRpc('mark_all_notifications_read', {}); NC.items.forEach(x => { x.is_read = true; }); drawNotifs(); setBell(0); refreshBell(true); }
+    catch (err) { toast(Remote.errorText(err)); }
+    finally { if (document.body.contains(btn)) busy(btn, false); }
+  }
+
+  /* ---------- R19 likers: own Story only; the server refuses anyone else (post_likers) ---------- */
+  const LK = { post: null, rows: [], next: null, seq: 0 };
+  function likerMarkup(r) {
+    return `<button class="side-link handle-result" data-open-profile="${esc(r.user_id)}"><span class="avatar" aria-hidden="true">${Avatar.inner({ name: r.display_name || r.handle || 'G', photoUrl: Remote.avatarUrl(r.avatar_path), avatarType: r.avatar_type || (r.avatar_path ? 'photo' : 'initial'), pixelSpec: r.pixel_avatar_data || null })}</span><span><b>${esc(r.display_name || t('notif.member'))}</b>${r.handle ? `<small>@${esc(r.handle)}</small>` : ''}</span></button>`;
+  }
+  async function loadLikers(append) {
+    const seq = ++LK.seq, cur = append ? LK.next : null, box = () => document.getElementById('likers-list');
+    try {
+      const rows = (await memberRpc('post_likers', { p_post_id: LK.post, p_before: cur ? cur.liked_at : null, p_before_id: cur ? cur.user_id : null, p_limit: 50 })) || [];
+      if (seq !== LK.seq || !box()) return;
+      LK.rows = append ? LK.rows.concat(rows) : rows; LK.next = rows.length === 50 ? rows[49] : null;
+      box().innerHTML = LK.rows.length ? LK.rows.map(likerMarkup).join('') + (LK.next ? `<button class="secondary" data-action="likers-more">${t('likers.more')}</button>` : '') : `<p class="form-help">${t('likers.empty')}</p>`;
+    } catch (err) { if (seq === LK.seq && box()) box().innerHTML = `<p class="form-error" role="alert">${t('likers.error')}</p>`; }
+  }
+  function likersDialog(postId) {
+    const p = findPost(postId); if (!p || !p.remote || !p.own || !Remote.isId(postId)) return;
+    LK.post = postId; LK.rows = []; LK.next = null;
+    openDialog(t('likers.title'), `<p class="form-help">${t('likers.note')}</p><div id="likers-list"><p class="form-help" role="status">${t('notif.loading')}</p></div>`);
+    loadLikers(false);
+  }
+  function decoratePostMenu(postId) {
+    const c = document.getElementById('dialog-content'); if (!dialog.open || !c) return;
+    const share = c.querySelector(`[data-action=share-post][data-id="${CSS.escape(postId)}"]`);
+    if (share && !share.dataset.r19) { share.dataset.r19 = '1'; share.lastChild && share.lastChild.nodeType === 3 && (share.lastChild.textContent = t('share.menu')); }
+    const p = findPost(postId);
+    if (p && p.remote && p.own && !c.querySelector('[data-action=post-likers]')) c.insertAdjacentHTML('afterbegin', `<button class="side-link" data-action="post-likers" data-id="${esc(postId)}">${icon('heart')}${t('likers.menu')}</button>`);
+  }
+
+  /* ---------- R19 share: Web Share when available, otherwise Copy Link; nothing is counted ---------- */
+  async function sharePost(id) {
+    const url = location.origin + location.pathname + '#post/' + id;
+    if (dialog.open) closeDialog();
+    if (typeof navigator.share === 'function') {
+      try { await navigator.share({ title: 'GERARAI', text: t('share.text'), url }); return; }
+      catch (err) { if (err && err.name === 'AbortError') return; }
+    }
+    try { await navigator.clipboard.writeText(url); toast(t('share.copied')); }
+    catch {
+      openDialog(t('share.title'), `<p class="form-help">${t('share.manual')}</p><label class="form-field">${t('share.link')}<input value="${esc(url)}" readonly data-share-url></label>`);
+      document.querySelector('[data-share-url]')?.select();
+    }
+  }
+
   /* ---------- click interception (capture phase, runs before app.js handler) ---------- */
   const GATED = { compose: 'เข้าสู่ระบบเพื่อแชร์เรื่องราวของคุณ', like: 'เข้าสู่ระบบเพื่อกดถูกใจ', comments: 'เข้าสู่ระบบเพื่ออ่านและแสดงความคิดเห็น', save: 'เข้าสู่ระบบเพื่อบันทึกเรื่องราว', 'save-place': 'เข้าสู่ระบบเพื่อบันทึกสถานที่', follow: 'เข้าสู่ระบบเพื่อติดตาม', report: 'เข้าสู่ระบบเพื่อรายงาน', block: 'เข้าสู่ระบบเพื่อบล็อก', 'emergency-report': 'เข้าสู่ระบบเพื่อรายงานสถานการณ์', 'profile-report': 'เข้าสู่ระบบเพื่อรายงาน', 'profile-block': 'เข้าสู่ระบบเพื่อบล็อก', 'profile-unblock': '', 'edit-profile': '', safety: '' };
   const SAMPLE_BLOCKED = new Set(['like', 'save', 'report', 'block', 'follow']);
@@ -764,6 +921,15 @@
     const a = b.dataset.action, id = b.dataset.id;
     if (a === 'signin') { stop(e); signInDialog(); return; }
     if (a === 'signout') { stop(e); signOut(); return; }
+    // R19: real Notification Center / likers / share (the prototype sample dialog and copy-link stay only in app.js local mode)
+    if (a === 'notifications') { stop(e); if (Remote.user) openNotifications(); else signInDialog(); return; }
+    if (a === 'notif-read-all') { stop(e); readAllNotifications(b); return; }
+    if (a === 'notif-more') { stop(e); loadNotifs(true); return; }
+    if (b.dataset.notif) { stop(e); openNotificationItem(b.dataset.notif, b); return; }
+    if (a === 'post-likers') { stop(e); likersDialog(id); return; }
+    if (a === 'likers-more') { stop(e); loadLikers(true); return; }
+    if (a === 'share-post' && Remote.isId(id)) { stop(e); sharePost(id); return; }
+    if (a === 'post-more' && Remote.isId(id)) setTimeout(() => decoratePostMenu(id), 0);   // app.js still opens the menu
     // UX cleanup (2026-10-14): a member's name / avatar opens their full Public Profile directly (Follow, block and visibility
     // rules live there). The Mini Profile card is kept behind config.js ui.miniProfileCard (default off).
     if (b.dataset.person) { const p = findPost(b.dataset.person); if (p?.remote && !p.own && Remote.isId(p.authorId)) { stop(e); if (UI.miniProfileCard === true) { personDialog(p); drawPersonProgress(p); } else { if (dialog.open) closeDialog(); navigate('u/' + p.authorId); } } return; }
