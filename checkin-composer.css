@@ -27,3 +27,5 @@
 .venue-pin b { width:26px; height:26px; border-radius:50% 50% 50% 0; transform:rotate(-45deg); background:#2d4fd8; border:2px solid #fff; box-shadow:0 2px 6px rgba(16,27,48,.35); }
 .venue-pin.external b { background:#fff; border:2px solid #5b6476; }
 .venue-pin span { font-size:.72rem; background:rgba(255,255,255,.92); padding:1px 6px; border-radius:6px; color:#101b30; }
+/* R20 patch 2: optional Journey country for a point check-in */
+.s4-country small{display:block;margin-top:4px;color:#66766d;font-size:12px;line-height:1.5}

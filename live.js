@@ -548,7 +548,7 @@
       <div class="profile-progress">${Progression.progressCard({ avatarHtml: profileProgressAvatar(pr, myAvatar()), name: pr.display_name, state: myState(), cls: myClass(), note: Remote.progression.available ? '' : PROG_PENDING })}${Progression.badgeStrip({ catalog: Remote.progression.catalog, earned: myEarned() })}</div>
       <div class="profile-meta">${joined ? `<span>${icon('calendar')}เข้าร่วมเมื่อ ${esc(joined)}</span>` : ''}</div>
       <div class="profile-stats" id="live-stats"><div><b>–</b><small>เรื่องราว</small></div><div><b>–</b><small>ผู้ติดตาม</small></div><div><b>–</b><small>กำลังติดตาม</small></div><div><b>${savedPlaces.length}</b><small>สถานที่ที่บันทึก</small></div></div></section>
-      <div data-journey-profile="${esc(Remote.user.id)}"></div>
+      <div data-journey-profile="${esc(Remote.user.id)}" data-journey-name="${esc(pr.display_name || '')}"></div>
       <div class="profile-tabs" role="tablist" aria-label="เนื้อหาโปรไฟล์">${tabs.map(([key, name]) => `<button class="tab ${profileTab === key ? 'active' : ''}" role="tab" aria-selected="${profileTab === key}" data-profile-tab="${key}">${name}</button>`).join('')}</div><div id="profile-content">${content}</div></div>`;
     Remote.stats().then(s => {
       const el = document.getElementById('live-stats');
@@ -668,7 +668,7 @@
       <div class="profile-meta">${joined ? `<span>${icon('calendar')}เข้าร่วมเมื่อ ${esc(joined)}</span>` : ''}</div>
       ${stats ? `<div class="profile-stats"><div><b>${stats.posts}</b><small>เรื่องราว</small></div><div><b>${stats.followers}</b><small>ผู้ติดตาม</small></div><div><b>${stats.following}</b><small>กำลังติดตาม</small></div></div>` : ''}
       </section>
-      <div data-journey-profile="${esc(id)}"></div>
+      <div data-journey-profile="${esc(id)}" data-journey-name="${esc(name)}"></div>
       <div class="profile-tabs" role="tablist" aria-label="เนื้อหาโปรไฟล์">${[['posts', 'เรื่องราว'], ['album', 'อัลบั้ม']].map(([k, t]) => `<button class="tab ${publicTab === k ? 'active' : ''}" role="tab" aria-selected="${publicTab === k}" data-public-tab="${k}">${t}</button>`).join('')}</div><div id="profile-content">${content}</div></div>`;
   }
   function renderPublicProfile(id) {
@@ -691,6 +691,15 @@
     if (route.startsWith('u/')) {
       if (map) { map.remove(); map = null; }
       renderNav(); renderPublicProfile(route.slice(2)); decorateIcons(main); return;
+    }
+    if (route.startsWith('journey/')) {   // R20 Full Journey Map (viewer-aware; the server decides what this member may see)
+      if (map) { map.remove(); map = null; }
+      const [, jid, jcc] = route.split('/');
+      const jname = Remote.user && jid === Remote.user.id ? (Remote.profile?.display_name || '') : (publicCache.get(jid)?.profile?.display_name || '');
+      renderNav();
+      if (window.GerarAIJourney) window.GerarAIJourney.renderFull(main, jid, jcc || null, jname);
+      else main.innerHTML = empty('ยังโหลดแผนที่การเดินทางไม่ได้', '');
+      decorateIcons(main); return;
     }
     baseRender();
   };
@@ -991,6 +1000,10 @@
     if (!res.ok) throw Object.assign(new Error(body?.message || 'HTTP ' + res.status), { code: body?.code || String(res.status), status: res.status });
     return body;
   }
+  // R20 Journey: journey-summary.js may call ONLY its two viewer-aware read RPCs with the member session.
+  window.GerarAIJourneyRpc = Object.freeze((name, args) => ['profile_journey', 'profile_journey_points'].includes(name) ? memberRpc(name, args) : Promise.reject(new Error('rpc_not_allowed')));
+  // R20 patch 2: the composer's optional canonical country for its own map_pin / current_location Story (author-only RPCs).
+  window.GerarAICheckinCountryRpc = Object.freeze((name, args) => ['set_story_checkin_country', 'story_checkin_country'].includes(name) ? memberRpc(name, args) : Promise.reject(new Error('rpc_not_allowed')));
 
   // Following feed: the server lists ids (following_feed); each Story is read through the normal RLS read path (fetchPost).
   const FF = { ids: [], cache: new Map(), next: null, following: null, loaded: false, loading: false, error: null, seq: 0, at: 0 };

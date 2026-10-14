@@ -1,0 +1,11 @@
+GERARAI country flags (assets/flags/*.svg)
+
+Graphics: Twemoji v14.0.1, Copyright Twitter, Inc and other contributors.
+License: Creative Commons Attribution 4.0 International (CC-BY 4.0), https://creativecommons.org/licenses/by/4.0/
+Upstream: https://github.com/twitter/twemoji (graphics), as packaged in the TeX Live "twemojis" package v1.3.1
+(all-twemojis.pdf, by Jost Rossel), from which the 258 regional-indicator flag glyphs were extracted.
+
+Changes made by GERARAI (2026-10-14): each flag page was converted from PDF to SVG (pdftocairo), the viewBox was cropped to the
+centred square of the flag for circular display, colours were rewritten as hex and coordinates rounded to 2 decimals. Files are
+named by ISO 3166-1 alpha-2 code in lower case (plus the few non-ISO regional-indicator pairs Twemoji ships, e.g. ac, ea, eu, un).
+No flag is loaded from any external host.

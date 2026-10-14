@@ -5,6 +5,15 @@
  const drafts=new Map();let current=null,generation=0,picker=null;
  const labels={none:'ไม่เช็กอิน',area:'พื้นที่',venue:'สถานที่',current_location:'ตำแหน่งปัจจุบัน',map_pin:'จุดบนแผนที่',legacy_unconfirmed:'เช็กอินเดิม'};
  const meaningful=s=>!!String(s||'').replace(/[\p{White_Space}\p{Cf}\p{Cc}]/gu,'');
+ // R20 patch 2: optional canonical country for a map_pin / current_location Story (Journey Memory, not verified travel).
+ // ISO 3166-1 alpha-2 (249 assigned codes) = the server constraint posts_checkin_country_iso. Never free text; no reverse geocoding.
+ const ISO_COUNTRIES='AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BV BW BY BZ CA CC CD CF CG CH CI CK CL CM CN CO CR CU CV CW CX CY CZ DE DJ DK DM DO DZ EC EE EG EH ER ES ET FI FJ FK FM FO FR GA GB GD GE GF GG GH GI GL GM GN GP GQ GR GS GT GU GW GY HK HM HN HR HT HU ID IE IL IM IN IO IQ IR IS IT JE JM JO JP KE KG KH KI KM KN KP KR KW KY KZ LA LB LC LI LK LR LS LT LU LV LY MA MC MD ME MF MG MH MK ML MM MN MO MP MQ MR MS MT MU MV MW MX MY MZ NA NC NE NF NG NI NL NO NP NR NU NZ OM PA PE PF PG PH PK PL PM PN PR PS PT PW PY QA RE RO RS RU RW SA SB SC SD SE SG SH SI SJ SK SL SM SN SO SR SS ST SV SX SY SZ TC TD TF TG TH TJ TK TL TM TN TO TR TT TV TW TZ UA UG UM US UY UZ VA VC VE VG VI VN VU WF WS YE YT ZA ZM ZW'.split(' ');
+ const POINT=k=>k==='map_pin'||k==='current_location';
+ const countryRpc=(n,a)=>typeof window.GerarAICheckinCountryRpc==='function'?window.GerarAICheckinCountryRpc(n,a):Promise.reject(new Error('country_unavailable'));
+ let countryNames=null;function countryOptions(){if(!countryNames){let dn=null;try{dn=new Intl.DisplayNames(['th'],{type:'region'});}catch{}
+  countryNames=ISO_COUNTRIES.map(c=>[c,(dn&&dn.of(c))||c]).sort((a,b)=>a[1].localeCompare(b[1],'th'));}return countryNames;}
+ // Effective point state of the draft: a new point being set, or an unchanged (keep) point Story. Hidden → no country.
+ function pointState(d){if(d.checkin.op==='set')return POINT(d.checkin.kind)?d.checkin.precision:null;if(d.checkin.op==='keep'&&POINT(d.initial?.kind))return d.initial.precision||null;return null;}
  const extractTags=body=>[...new Set([...body.matchAll(/#([\p{L}\p{M}\p{N}_]+)/gu)].map(m=>m[1]))].slice(0,10);
  function cleanup(){generation++;picker?.destroy();picker=null;}
  const previousOpen=openDialog;
@@ -23,6 +32,7 @@
    <label class="photo-upload">${icon('camera')} เพิ่มภาพ<input name="photo" type="file" accept="image/png,image/jpeg,image/webp" aria-label="แนบภาพเรื่องราว"></label>
    <div class="s4-media">${d.media.map((m,i)=>`<div><img src="${esc(m.image?.dataUrl||m.url)}" alt="ภาพที่แนบ"><button type="button" data-s4-media="${i}" aria-label="นำภาพออก">นำภาพออก</button></div>`).join('')}</div>
    <div class="s4-checkin"><button class="secondary" type="button" data-s4="checkin">📍 ${d.checkin.op==='remove'?'Check-in':esc(nameOf(d)||'Check-in')}</button>${d.checkin.op!=='remove'&&nameOf(d)?'<button class="text-button" type="button" data-s4="remove">นำเช็กอินออก</button>':''}</div>
+   ${(()=>{const ps=pointState(d);return ps&&ps!=='hidden'?`<label class="form-field s4-country">ประเทศ (ไม่บังคับ)<select name="checkin-country"><option value="">ไม่ระบุประเทศ</option>${countryOptions().map(([c,n])=>`<option value="${c}" ${d.country===c?'selected':''}>${esc(n)}</option>`).join('')}</select><small>นับใน “ประเทศที่ไปแล้ว” ของ Journey เท่านั้น ไม่ใช่การยืนยันสถานที่</small></label>`:'';})()}
    <div class="s4-consent"></div></fieldset>${errbox}
    ${d.conflict?'<p>เรื่องราวนี้มีการแก้ไขจากที่อื่นแล้ว ข้อความร่างของคุณยังอยู่</p><button type="button" class="secondary" data-s4="reload">โหลดข้อมูลล่าสุดเพื่อตรวจทานก่อนบันทึก</button>':''}
    <div class="form-submit"><button type="button" class="secondary" data-s4="close">เก็บร่างไว้ก่อน</button><button type="submit" class="primary" ${d.busy||d.preparing||d.conflict?'disabled':''}>${d.busy?'กำลังบันทึก…':d.uncertain?'ลองส่งคำขอเดิมอีกครั้ง':d.edit?'บันทึก':'เผยแพร่'}</button></div>
@@ -41,14 +51,16 @@
   form.addEventListener('submit',e=>{e.preventDefault();e.stopImmediatePropagation();save(d);});
   form.querySelectorAll('[data-s4-media]').forEach(b=>b.onclick=()=>{d.media.splice(+b.dataset.s4Media,1);d.mediaChanged=true;d.pending=null;main(d);});
   form.querySelector('[data-s4=checkin]').onclick=()=>choices(d);
-  form.querySelector('[data-s4=remove]')?.addEventListener('click',()=>{d.checkin={op:'remove'};d.label='';d.pending=null;main(d);});
+  form.querySelector('[name=checkin-country]')?.addEventListener('change',e=>{const v=e.target.value;d.country=ISO_COUNTRIES.includes(v)?v:null;d.countryDirty=true;});
+  form.querySelector('[data-s4=remove]')?.addEventListener('click',()=>{d.checkin={op:'remove'};d.label='';d.pending=null;d.country=null;main(d);});
   form.querySelector('[data-s4=close]').onclick=()=>closeDialog();
   form.querySelector('[data-s4=discard]').onclick=()=>{drafts.delete(d.key);current=null;closeDialog();};
   form.querySelector('[data-s4=reload]')?.addEventListener('click',async()=>{
    const g=generation;try{const latest=await R.storyCheckinForEdit(d.id);if(!valid(d,g))return;
     // Preserve all explicit draft edits. A keep operation follows the latest server state.
     d.revision=latest.revision;d.initial=latest;
-    if(d.checkin.op==='keep'){d.label=latest.kind==='none'?'':labels[latest.kind];d.category=latest.category_code||d.category;}
+    if(d.checkin.op==='keep'){d.label=latest.kind==='none'?'':labels[latest.kind];d.category=latest.category_code||d.category;
+     if(!d.countryDirty){d.country=null;if(POINT(latest.kind)){try{const c=await countryRpc('story_checkin_country',{p_post_id:d.id});if(!valid(d,g))return;d.country=ISO_COUNTRIES.includes(c)?c:null;}catch{}}}}
     if(!d.mediaChanged)d.media=latest.media;
     d.pending=null;d.conflict=false;
     main(d,`อ่านข้อมูลล่าสุดแล้ว (${labels[latest.kind]||'เช็กอินเดิม'}) ร่างที่คุณแก้ยังอยู่ กรุณาตรวจทานก่อนกดบันทึก`);
@@ -96,7 +108,7 @@
   shell(d,kind==='area'?'ยืนยันพื้นที่':'ยืนยันสถานที่',`<p><strong>${esc(label)}</strong></p><p>${kind==='area'?'การเช็กอินนี้ไม่สร้างหมุดบนแผนที่':'หมุดบนแผนที่ (ถ้าแสดงชื่อสถานที่) คือตำแหน่งสาธารณะของสถานที่ ไม่ใช่ตำแหน่งของคุณ'}</p>${src}<label class="form-field">การแสดงชื่อ<select name="disclosure"><option value="${kind}">${kind==='area'?'แสดงชื่อพื้นที่':'แสดงชื่อสถานที่'}</option><option value="private">เก็บไว้ส่วนตัว</option></select></label>${errbox}<div class="form-submit"><button class="secondary" data-s4="back">ยกเลิก</button><button class="primary" data-s4="confirm">ใช้${kind==='area'?'พื้นที่':'สถานที่'}นี้</button></div>`);back(d);
   dialogContent.querySelector('[data-s4=confirm]').onclick=()=>{
    const disclosure=dialogContent.querySelector('[name=disclosure]').value;
-   d.checkin={op:'set',kind,disclosure,...(kind==='area'?{area_id:item.id,confirm_area:disclosure==='area'}:{place_id:item.id})};d.label=label;d.pending=null;main(d);
+   d.checkin={op:'set',kind,disclosure,...(kind==='area'?{area_id:item.id,confirm_area:disclosure==='area'}:{place_id:item.id})};d.label=label;d.pending=null;d.country=null;main(d);
   };
  }
  function gps(d){
@@ -120,7 +132,7 @@
   privacy.onchange=update;
   confirm.onclick=()=>{if(confirm.disabled)return;const precision=privacy.value,category_code=dialogContent.querySelector('[name=point-category]').value;
    d.category=category_code;d.checkin={op:'set',kind,point_intent:true,precision,category_code,disclosure:'private',...(precision==='hidden'?{}:point)};
-   d.label=labels[kind]+' · '+({exact:'ตรงจุด',approximate:'โดยประมาณ',hidden:'ซ่อนตำแหน่ง'}[precision]);d.pending=null;main(d);
+   d.label=labels[kind]+' · '+({exact:'ตรงจุด',approximate:'โดยประมาณ',hidden:'ซ่อนตำแหน่ง'}[precision]);d.pending=null;if(precision==='hidden')d.country=null;main(d);
   };
   update();try{const map=await GerarAIMapProvider.createAsync(dialogContent.querySelector('.s4-map'),{center:point?[point.latitude,point.longitude]:[16.3,99.9],zoom:point?15:6,onPick:(latitude,longitude)=>{if(valid(d,g)){point={latitude,longitude};update();}},onTiles:good=>{if(!good&&valid(d,g))error('โหลดพื้นแผนที่ไม่ได้ ลองใหม่ภายหลังได้ โดยร่างยังอยู่');}});
    if(!valid(d,g)){map.destroy();return;}picker=map;update();
@@ -138,11 +150,15 @@
     d.pending={p_request_id:crypto.randomUUID(),p_post_id:d.id,p_expected_revision:d.revision,p_content:content,p_checkin:structuredClone(d.checkin)};
    }
    const result=await R.mutateStoryCheckin(d.pending);
+   // A new point always starts without a country on the server (trigger), so a chosen country is re-sent; a kept point only on change.
+   const ps=pointState(d),wantCountry=ps&&ps!=='hidden'&&(d.checkin.op==='set'?!!d.country:d.countryDirty);let countryFailed=false;
+   if(wantCountry){try{await countryRpc('set_story_checkin_country',{p_post_id:result.post_id,p_country:d.country||null,p_expected_revision:result.revision});}
+    catch(e){countryFailed=true;console.warn('[GERARAI] check-in country',e?.code||e?.message);}}
    drafts.delete(d.key);d.busy=false;d.uncertain=false;
    if(current===d&&dialogContent.querySelector('[data-s4-form]')){current=null;closeDialog();}
    // A failed read/refresh is never treated as a failed write or followed by destructive cleanup.
    try{const post=await R.fetchPost(result.post_id);if(post&&!d.edit)R.data.posts=[post,...R.data.posts.filter(p=>p.id!==post.id)];await R.refreshProgression();}catch{}
-   if(d.edit)render();else navigate('feed');toast('บันทึกเรื่องราวแล้ว');dispatchEvent(new CustomEvent('gerarai:story-changed',{detail:{postId:result.post_id}}));
+   if(d.edit)render();else navigate('feed');toast(countryFailed?'บันทึกเรื่องราวแล้ว แต่ยังบันทึกประเทศไม่สำเร็จ แก้ไขเรื่องราวเพื่อเลือกอีกครั้งได้':'บันทึกเรื่องราวแล้ว');dispatchEvent(new CustomEvent('gerarai:story-changed',{detail:{postId:result.post_id}}));
   }catch(e){d.busy=false;if(d.owner!==R.user?.id)return;
    const conflict=e.code==='40001'||/revision_conflict/.test(e.message||'');d.conflict=conflict;
    // A transport failure has an unknown commit outcome: freeze this exact request until resolved.
@@ -154,9 +170,10 @@
  async function open(id=null){
   if(!R.user){toast('เข้าสู่ระบบก่อนแชร์เรื่องราว');return;}const key=id||'new';let d=drafts.get(key);
   if(d?.busy){current=d;openDialog('กำลังบันทึก','');main(d);return;}
-  if(!d){d={key,id:id||crypto.randomUUID(),owner:R.user.id,edit:!!id,revision:-1,title:'',body:'',media:[],mediaChanged:false,category:'other',checkin:{op:'remove'},label:''};
+  if(!d){d={key,id:id||crypto.randomUUID(),owner:R.user.id,edit:!!id,revision:-1,title:'',body:'',media:[],mediaChanged:false,category:'other',checkin:{op:'remove'},label:'',country:null,countryDirty:false};
    if(id){current=d;openDialog('แก้ไขเรื่องราว','<p>กำลังโหลด…</p>');const g=++generation;
-    try{const state=await R.storyCheckinForEdit(id);if(!valid(d,g))return;Object.assign(d,{revision:state.revision,initial:state,title:state.content.title||'',body:state.content.body||'',media:state.media,category:state.category_code||'other',checkin:{op:'keep'},label:state.kind==='none'?'':labels[state.kind]});}
+    try{const state=await R.storyCheckinForEdit(id);if(!valid(d,g))return;Object.assign(d,{revision:state.revision,initial:state,title:state.content.title||'',body:state.content.body||'',media:state.media,category:state.category_code||'other',checkin:{op:'keep'},label:state.kind==='none'?'':labels[state.kind]});
+     if(POINT(state.kind)){try{const c=await countryRpc('story_checkin_country',{p_post_id:id});if(!valid(d,g))return;d.country=ISO_COUNTRIES.includes(c)?c:null;}catch{d.country=null;}}}
     catch(e){if(valid(d,g))dialogContent.textContent=R.errorText(e);return;}
    }drafts.set(key,d);
   }
